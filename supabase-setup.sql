@@ -20,6 +20,7 @@ create table if not exists public.items (
   category    text,
   qty         integer not null default 0,
   price       numeric not null default 0,
+  cost        numeric not null default 0,
   threshold   integer not null default 5,
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
@@ -43,8 +44,9 @@ create index if not exists items_store_idx   on public.items(store_id);
 create index if not exists sales_store_idx   on public.sales(store_id);
 create index if not exists sales_ts_idx      on public.sales(ts);
 
--- For projects set up before this column existed (safe to re-run):
+-- For projects set up before these columns existed (safe to re-run):
 alter table public.sales add column if not exists date date;
+alter table public.items add column if not exists cost numeric not null default 0;
 
 -- Row Level Security: a signed-in user can only ever touch their own rows.
 alter table public.stores enable row level security;
@@ -56,4 +58,16 @@ create policy "own stores" on public.stores
 create policy "own items" on public.items
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy "own sales" on public.sales
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- Assistant conversation, one row per store (so it follows the user across devices).
+create table if not exists public.chats (
+  id         text primary key,                -- same id as the store it belongs to
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  store_id   text not null references public.stores(id) on delete cascade,
+  messages   jsonb not null default '[]',
+  updated_at timestamptz not null default now()
+);
+alter table public.chats enable row level security;
+create policy "own chats" on public.chats
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);

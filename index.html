@@ -452,6 +452,9 @@
         </div>
         <div class="field-row">
           <div class="field"><label>Unit price</label><input id="fPrice" type="number" min="0" step="0.01" value="0" /></div>
+          <div class="field"><label>Unit cost (optional)</label><input id="fCost" type="number" min="0" step="0.01" value="0" /></div>
+        </div>
+        <div class="field-row">
           <div class="field"><label>Category (optional)</label><input id="fCategory" placeholder="e.g. Electronics" /></div>
         </div>
         <div class="dialog-actions">
@@ -494,6 +497,13 @@
     <script>
       "use strict";
 
+      // ================= Architecture =================
+      // state (below) is the single owner of the active store's data. UI handlers call the
+      // engine (handleCommand, reports) or flows (activateStore, removeItem), which mutate
+      // state and persist through saveAll/syncStoreToCloud; renderers only read state.
+      // Raw localStorage access for store data lives in loadLS/saveLS; auth UI never
+      // touches the cloud layer directly.
+
       // ================= Cloud (Supabase) =================
       // Setup: free project at supabase.com, run supabase-setup.sql in its SQL Editor,
       // paste the project URL + anon key. Without them the app runs offline-only.
@@ -501,12 +511,22 @@
       const CFG = loadCFG();
       const SB_URL = (CFG.url || "").trim();
       const SB_KEY = (CFG.key || "").trim();
-      const sb = SB_URL && SB_KEY && window.supabase ? window.supabase.createClient(SB_URL, SB_KEY) : null;
+      let sb = SB_URL && SB_KEY && window.supabase ? window.supabase.createClient(SB_URL, SB_KEY) : null;
       let cloudUser = null;      // signed-in user
       let cloudStores = [];      // rows of public.stores for this user
 
       function loadCFG() {
         try { return JSON.parse(localStorage.getItem(CFG_KEY) || "{}"); } catch { return {}; }
+      }
+
+      // Validate config fields and build a client from what the user just pasted.
+      function makeClient() {
+        const url = $("cfgUrl").value.trim();
+        const key = $("cfgKey").value.trim();
+        if (!/^https:\/\/.+\.supabase\.co\/?$/.test(url)) return { error: "URL should look like https://xxxxx.supabase.co" };
+        if (key.length < 30) return { error: "Paste the anon/public key from Settings → API." };
+        if (!window.supabase) return { error: "Supabase library failed to load — check your connection and reload." };
+        return { client: window.supabase.createClient(url, key) };
       }
 
       // True when the active store is a signed-in cloud store (i.e. cloud reads/writes apply).
@@ -529,6 +549,9 @@
           return fallback;
         }
       }
+      function saveLS(key, value) {
+        localStorage.setItem(key, JSON.stringify(value));
+      }
 
       const GREETING = [
         { role: "bot", text: '👋 Hi! I\'m your inventory assistant.\nTry:\n• "add 10 pens"\n• "sold 3 pens"\n• "set pens to 25"\n• "what\'s low?"' },
@@ -548,10 +571,17 @@
 
       // Write-through cache: localStorage first (instant reloads), cloud best-effort.
       function saveAll() {
-        localStorage.setItem(LS_STORE + state.storeId + ".items", JSON.stringify(state.items));
-        localStorage.setItem(LS_STORE + state.storeId + ".chat", JSON.stringify(state.chat.slice(-200)));
-        localStorage.setItem(LS_STORE + state.storeId + ".sales", JSON.stringify(state.sales));
+        saveLS(LS_STORE + state.storeId + ".items", state.items);
+        saveLS(LS_STORE + state.storeId + ".chat", state.chat.slice(-200));
+        saveLS(LS_STORE + state.storeId + ".sales", state.sales);
         if (cloudActive()) syncStoreToCloud().catch((e) => console.warn("cloud sync failed", e.message));
+      }
+
+      // Delete an item everywhere: state, local cache, and cloud (else the next pull resurrects it).
+      function removeItem(id) {
+        state.items = state.items.filter((x) => x._id !== id);
+        saveAll();
+        deleteFromCloud("items", id);
       }
 
       // Push the active store's data to Supabase (upsert; rows keyed by app-generated ids).
@@ -559,39 +589,44 @@
         const sid = state.storeId;
         const rows = state.items.map((it) => ({
           id: it._id, user_id: cloudUser.id, store_id: sid, name: it.name, description: it.description,
-          category: it.category, qty: it.qty, price: it.price, threshold: it.threshold,
+          category: it.category, qty: it.qty, price: it.price, cost: it.cost, threshold: it.threshold,
           created_at: new Date(it.createdAt).toISOString(), updated_at: new Date().toISOString(),
         }));
         const salesRows = state.sales.map((s) => ({
           id: s.id, user_id: cloudUser.id, store_id: sid, item_id: s.itemId, name: s.name,
           qty: s.qty, price: s.price, kind: s.kind, ts: new Date(s.ts).toISOString(), date: s.date,
         }));
-        const [r1, r2] = await Promise.all([
+        const chatRow = { id: sid, user_id: cloudUser.id, store_id: sid, messages: state.chat.slice(-200), updated_at: new Date().toISOString() };
+        const [r1, r2, r3] = await Promise.all([
           sb.from("items").upsert(rows),
           sb.from("sales").upsert(salesRows),
+          sb.from("chats").upsert(chatRow),
         ]);
         if (r1.error) throw r1.error;
         if (r2.error) throw r2.error;
+        if (r3.error) throw r3.error;
       }
 
       // Pull a store's rows from Supabase into `state` (used on sign-in and store switch).
       async function pullStoreFromCloud(storeId) {
-        const [{ data: items, error: e1 }, { data: sales, error: e2 }] = await Promise.all([
+        const [{ data: items, error: e1 }, { data: sales, error: e2 }, { data: chats, error: e3 }] = await Promise.all([
           sb.from("items").select("*").eq("store_id", storeId),
           sb.from("sales").select("*").eq("store_id", storeId),
+          sb.from("chats").select("messages").eq("id", storeId),
         ]);
         if (e1) throw e1;
         if (e2) throw e2;
+        if (e3) throw e3;
         state.storeId = storeId;
         state.items = (items || []).map((r) => ({
           _id: r.id, name: r.name, description: r.description || "", category: r.category || "",
-          qty: r.qty, price: Number(r.price), threshold: r.threshold, createdAt: Date.parse(r.created_at), // PostgREST returns numeric as a string
+          qty: r.qty, price: Number(r.price), cost: Number(r.cost), threshold: r.threshold, createdAt: Date.parse(r.created_at), // PostgREST returns numeric as a string
         }));
         state.sales = (sales || []).map((r) => ({
           id: r.id, itemId: r.item_id, name: r.name, qty: r.qty, price: Number(r.price),
           kind: r.kind, ts: Date.parse(r.ts), date: r.date,
         }));
-        state.chat = loadLS(LS_STORE + storeId + ".chat", GREETING);
+        state.chat = (chats && chats[0] && chats[0].messages) || GREETING;
         state.currency = cloudStores.find((s) => s.id === storeId)?.currency || "USD";
       }
 
@@ -738,6 +773,7 @@
         $("fQty").value = item?.qty ?? 0;
         $("fThreshold").value = item?.threshold ?? DEFAULT_THRESHOLD;
         $("fPrice").value = item?.price ?? 0;
+        $("fCost").value = item?.cost ?? 0;
         $("fCategory").value = item?.category ?? "";
         $("itemDialog").showModal();
       }
@@ -748,6 +784,7 @@
         const qty = Math.max(0, Math.round(Number($("fQty").value) || 0));
         const threshold = Math.max(0, Math.round(Number($("fThreshold").value) || 0));
         const price = Math.max(0, Number($("fPrice").value) || 0);
+        const cost = Math.max(0, Number($("fCost").value) || 0);
         const category = $("fCategory").value.trim() || undefined;
         const description = $("fDesc").value.trim() || undefined;
         const dup = state.items.find((it) => it.name.toLowerCase() === name.toLowerCase() && it._id !== state.editingId);
@@ -755,10 +792,10 @@
 
         if (state.editingId) {
           const it = state.items.find((x) => x._id === state.editingId);
-          if (it) Object.assign(it, { name, qty, threshold, price, category, description });
+          if (it) Object.assign(it, { name, qty, threshold, price, cost, category, description });
           toast(`Updated "${name}"`);
         } else {
-          state.items.push({ _id: uid(), name, qty, threshold, price, category, description, createdAt: Date.now() });
+          state.items.push({ _id: uid(), name, qty, threshold, price, cost, category, description, createdAt: Date.now() });
           toast(`Added "${name}"`);
         }
         saveAll();
@@ -779,9 +816,7 @@
         if (act === "minus") adjustQty(it, -1);
         if (act === "edit") openDialog(it);
         if (act === "del" && confirm(`Delete "${it.name}"?`)) {
-          state.items = state.items.filter((x) => x._id !== it._id);
-          saveAll();
-          deleteFromCloud("items", it._id);
+          removeItem(it._id);
           render();
           toast(`Deleted "${it.name}"`);
         }
@@ -870,6 +905,13 @@
         renderChat();
       }
 
+      // Make storeId the active store: load its data, remember the choice, re-render.
+      async function activateStore(storeId) {
+        await pullStoreFromCloud(storeId);
+        localStorage.setItem(LS_LASTSTORE, storeId);
+        applyActiveStore();
+      }
+
       function renderStoresUI() {
         const sel = $("storeSelect");
         sel.innerHTML = "";
@@ -887,9 +929,7 @@
       async function switchStore(storeId) {
         if (storeId === state.storeId) return;
         try {
-          await pullStoreFromCloud(storeId);
-          localStorage.setItem(LS_LASTSTORE, storeId);
-          applyActiveStore();
+          await activateStore(storeId);
           toast(`Switched to ${cloudStores.find((s) => s.id === storeId)?.name || "store"}`);
         } catch (e) {
           toast(`⚠️ Couldn't load store: ${e.message}`, 3600);
@@ -910,20 +950,20 @@
         if (!cloudStores.length) throw new Error("No stores found for this account");
         const last = localStorage.getItem(LS_LASTSTORE);
         const target = cloudStores.find((s) => s.id === last) || cloudStores[0];
-        await pullStoreFromCloud(target.id);
+        await activateStore(target.id);
         // One-time: a brand-new cloud store starts empty — seed it with this browser's pre-cloud data.
         if (!state.items.length) {
           const legacyItems = loadLS("stockpilot.items.v1", []);
           if (legacyItems.length) {
             state.items = legacyItems;
             state.sales = loadLS("stockpilot.sales.v1", []);
+            state.chat = loadLS("stockpilot.chat.v1", state.chat);
             state.currency = loadLS("stockpilot.currency", state.currency);
             target.currency = state.currency;
             await sb.from("stores").update({ currency: state.currency }).eq("id", target.id);
             await syncStoreToCloud();
           }
         }
-        localStorage.setItem(LS_LASTSTORE, target.id);
         hideAuth();
         applySessionUI();
         applyActiveStore();
@@ -941,12 +981,11 @@
 
       $("authToggle").addEventListener("click", () => setAuthMode(authMode === "signin" ? "signup" : "signin"));
       $("cfgSave").addEventListener("click", () => {
-        const url = $("cfgUrl").value.trim(), key = $("cfgKey").value.trim();
-        if (!/^https:\/\/.+\.supabase\.co\/?$/.test(url)) return authFail("URL should look like https://xxxxx.supabase.co");
-        if (key.length < 30) return authFail("Paste the anon/public key from Settings → API.");
-        localStorage.setItem(CFG_KEY, JSON.stringify({ url, key }));
-        toast("Cloud settings saved — reloading…");
-        setTimeout(() => location.reload(), 600);
+        const { client, error } = makeClient();
+        if (error) return authFail(error);
+        localStorage.setItem(CFG_KEY, JSON.stringify({ url: $("cfgUrl").value.trim(), key: $("cfgKey").value.trim() }));
+        sb = client;
+        toast("Cloud settings saved — you're ready to sign in");
       });
       $("offlineBtn").addEventListener("click", () => {
         hideAuth();
@@ -964,9 +1003,7 @@
           const { error } = await sb.from("stores").insert(row);
           if (error) throw error;
           cloudStores.push(row);
-          localStorage.setItem(LS_LASTSTORE, row.id);
-          await pullStoreFromCloud(row.id);
-          applyActiveStore();
+          await activateStore(row.id);
           toast(`✅ Store "${row.name}" created — empty, ready for its own stock`);
         } catch (e) {
           toast(`⚠️ Couldn't create store: ${e.message}`, 3600);
@@ -975,7 +1012,12 @@
       $("storeSelect").addEventListener("change", (e) => switchStore(e.target.value));
       $("authSubmit").addEventListener("click", async () => {
         const email = $("authEmail").value.trim(), pass = $("authPass").value;
-        if (!sb) return authFail("Configure the Supabase URL + key first.");
+        if (!sb) {
+          // First-use convenience: build the client from the fields the user just filled.
+          const built = makeClient();
+          if (built.error) return authFail(built.error);
+          sb = built.client;
+        }
         if (!email || !pass) return authFail("Enter your email and password.");
         const btn = $("authSubmit");
         btn.disabled = true;
@@ -1075,11 +1117,15 @@
         if (!text) return;
         pushChat("user", text);
         chatInput.value = "";
+        // Two Enter keydowns arrive within the 220ms thinking delay — ignore the second.
+        if (sendChat.pending) return;
+        sendChat.pending = true;
         setTimeout(() => {
           const reply = handleCommand(text);
           pushChat("bot", reply);
           saveAll();
           render();
+          sendChat.pending = false;
         }, 220);
       }
       $("chatSend").addEventListener("click", sendChat);
@@ -1093,7 +1139,24 @@
         $("chatChips").appendChild(b);
       }
 
-      // ================= Chat command parser =================
+      // ================= Command router =================
+      // Declarative route table: the first matcher that returns params wins, and
+      // its run() builds the reply. A run() may return undefined to fall through
+      // to later routes (used when an optional item reference doesn't resolve).
+      // Order matters only where phrasings overlap — price before qty-set,
+      // store-use before sale, sales-query before low-stock — and the table
+      // keeps that visible. "help" is generated from the same entries, so the
+      // command list can't drift from what actually routes.
+
+      function helpReply() {
+        return ["Here's what I can do:", ...ROUTES.filter((r) => r.help).map((r) => r.help)].join("\n");
+      }
+
+      function findItem(name) {
+        return resolveItem(name).item;
+      }
+
+      // ================= Item resolution & creation (pure engine) =================
       function normalizeName(s) {
         return String(s).trim().toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
       }
@@ -1120,7 +1183,7 @@
         return String(s).trim().replace(/\b\w/g, (c) => c.toUpperCase());
       }
 
-      function createItem(name, qty, price = 0, threshold = DEFAULT_THRESHOLD, category, description) {
+      function createItem(name, qty, price = 0, threshold = DEFAULT_THRESHOLD, category, description, cost = 0) {
         const dup = state.items.find((x) => normalizeName(x.name) === normalizeName(name));
         if (dup) {
           dup.qty += qty;
@@ -1130,7 +1193,7 @@
           const note = st === "out" ? " 🚨 Still out of stock!" : st === "low" ? " ⚠️ Low stock!" : "";
           return `✅ "${dup.name}" already existed — added ${qty}. Now ${dup.qty} in stock.${note}`;
         }
-        const item = { _id: uid(), name: titleCase(name), qty, price, threshold, category, description, createdAt: Date.now() };
+        const item = { _id: uid(), name: titleCase(name), qty, price, cost, threshold, category, description, createdAt: Date.now() };
         state.items.push(item);
         saveAll();
         const st = statusOf(item);
@@ -1138,6 +1201,7 @@
         return `✅ Created "${item.name}" with ${qty} units.${note}`;
       }
 
+      // ================= Reports =================
       function lowStockReply() {
         const outs = state.items.filter((it) => statusOf(it) === "out");
         const lows = state.items.filter((it) => statusOf(it) === "low");
@@ -1183,6 +1247,10 @@
         if (/week|7 ?day/.test(t)) return "week";
         return "day";
       }
+      // One span → human label, shared by every report reply.
+      function spanLabel(span) {
+        return span === "day" ? "Today" : span === "yesterday" ? "Yesterday" : span === "week" ? "Last 7 days" : "Last 30 days";
+      }
       function topItems(rows) {
         const byItem = new Map();
         for (const s of rows) {
@@ -1206,7 +1274,7 @@
       }
 
       function reportReply(span) {
-        const label = span === "day" ? "Today" : span === "yesterday" ? "Yesterday" : span === "week" ? "Last 7 days" : "Last 30 days";
+        const label = spanLabel(span);
         const rows = salesIn(span);
         const sales = rows.filter((s) => s.kind === "sale");
         const uses = rows.filter((s) => s.kind === "use");
@@ -1228,253 +1296,320 @@
         return lines.join("\n");
       }
 
-      function handleCommand(raw) {
-          const text = String(raw ?? "").trim();
-        const t = text.toLowerCase();
-        let m;
+      // Profit = revenue − (units sold × per-item cost). Items without a cost
+      // are counted at revenue only, and reported as missing-cost units.
+      function profitReply(span) {
+        const sales = salesIn(span).filter((s) => s.kind === "sale");
+        // Sales rows carry the item id (and a name snapshot for legacy rows).
+        const itemOf = (s) => state.items.find((x) => x._id === s.itemId) || state.items.find((x) => normalizeName(x.name) === normalizeName(s.name));
+        const costOf = (s) => itemOf(s)?.cost || 0;
+        const without = sales.filter((s) => costOf(s) <= 0).length;
+        const revenue = sales.reduce((n, s) => n + s.qty * s.price, 0);
+        const spent = sales.reduce((n, s) => n + s.qty * costOf(s), 0);
+        const profit = revenue - spent;
+        const lines = [
+          `💰 Profit ${spanLabel(span).toLowerCase()}:`,
+          `   Revenue: ${money(revenue)}`,
+          `   Cost: ${money(spent)}${without ? ` (${without} sale row${without === 1 ? "" : "s"} without a set cost — not counted)` : ""}`,
+          `   Profit: ${profit < 0 ? "−" : ""}${money(Math.abs(profit))}`,
+        ];
+        return lines.join("\n");
+      }
 
-        // empty input
-        if (!text) return "Type a command, e.g. \"add 10 pens\" — or \"help\" for the list.";
+      const stockNote = (it) => {
+        const st = statusOf(it);
+        return st === "out" ? " — OUT of stock 🚨" : st === "low" ? " — low stock ⚠️" : "";
+      };
 
-        // help
-        if (/^(help|what can you do\??|commands\??)$/.test(t)) {
-          return [
-            "Here's what I can do:",
-            '• "add 10 pens" — add a new item or stock',
-            '• "sold 3 pens" — record a sale (stock −3)',
-            '• "used 2 pens for store" — took from stock for the shop itself (no sale)',
-            '• "daily report" / "weekly report" / "monthly report"',
-            '• "what sold today?" / "top items this week"',
-            '• "set pens to 25" — set exact quantity',
-            '• "set price xiaomi 5a combo 1500 each" — change an item\'s price',
-            '• "what\'s low?" / "show inventory"',
-            '• "desc pens" — show description; "set desc pens: display unit" — set it',
-            '• "add item hammer, qty 20, price 9.5, desc for counter use"',
-            '• "how many pens do we have?" · "delete pens"',
-          ].join("\n");
+      // Shared stock-out path: store use and sales differ only in logging + wording.
+      function takeStock(item, qty, kind) {
+        if (item.qty < qty) return `⚠️ Only ${item.qty} of "${item.name}" in stock — can't remove ${qty}.`;
+        item.qty -= qty;
+        recordMovement(item, qty, kind);
+        saveAll();
+        maybeAlert(item);
+        if (kind === "use") return `🏪 Taken for store use: ${qty} × "${item.name}" — ${item.qty} left. (Logged as store use, not a sale.)`;
+        const st = statusOf(item);
+        const suffix = st === "out" ? " 🚨 Now OUT of stock!" : st === "low" ? " ⚠️ Low stock!" : "";
+        return `✅ Removed ${qty} from "${item.name}" — ${item.qty} left.${suffix}`;
+      }
+
+      // "add item hammer, qty 20, price 9.5, category tools, desc …"
+      function runAddItemDetail(m) {
+        const parts = m[1].split(",").map((s) => s.trim()).filter(Boolean);
+        const name = parts[0];
+        if (!name) return '🤔 What\'s the item name? e.g. "add item hammer, qty 20"';
+        let qty = 0, price = 0, cost = 0, threshold = DEFAULT_THRESHOLD, category, description;
+        for (const p of parts.slice(1)) {
+          let mm;
+          if ((mm = p.match(/^q(?:ty|uantity)?\s*(\d+(?:\.\d+)?)$/i))) qty = Math.round(Number(mm[1]));
+          else if ((mm = p.match(/^price\s*(\d+(?:\.\d+)?)$/i))) price = Number(mm[1]);
+          else if ((mm = p.match(/^cost\s*(\d+(?:\.\d+)?)$/i))) cost = Number(mm[1]);
+          else if ((mm = p.match(/^(?:low|threshold|alert)\s*(?:at|:)?\s*(\d+)$/i))) threshold = Math.round(Number(mm[1]));
+          else if ((mm = p.match(/^(?:cat|category)\s+(.+)$/i))) category = titleCase(mm[1]);
+          else if ((mm = p.match(/^(?:desc|description|note)\s*[:=]?\s*(.+)$/i))) description = mm[1].trim();
+          else if ((mm = p.match(/^(\d+(?:\.\d+)?)$/))) qty = Math.round(Number(mm[1]));
         }
-
-        // reports: "daily report" / "weekly report" / "monthly report" / "report today"
-        if (t.includes("report")) {
-          return reportReply(detectSpan(t));
+        const it = findItem(name);
+        if (it) {
+          if (qty) it.qty = qty;
+          it.price = price || it.price;
+          if (cost) it.cost = cost;
+          it.threshold = threshold;
+          if (category) it.category = category;
+          if (description) it.description = description;
+          saveAll();
+          return `✅ Updated "${it.name}" — now ${it.qty} in stock.`;
         }
+        return createItem(name, qty, price, threshold, category, description, cost);
+      }
 
-        // "what sold today/yesterday" / "top items this week" / "sales"
-        const salesQuery =
-          ((t.startsWith("what") || t.startsWith("which")) && t.includes("sold")) ||
-          t.startsWith("sales") || t.startsWith("sold items") ||
-          t.startsWith("top ") || t.startsWith("most used") ||
-          ((t.startsWith("show ") || t.startsWith("list ")) && (t.includes("sales") || t.includes("sold"))) ||
-          ((t.startsWith("how many") || t.startsWith("how much")) && /\b(sold|sell|sales)\b/.test(t) && /\b(today|yesterday|week|month)\b/.test(t)); // "how many combos did we sell today?"
-        if (salesQuery) {
-          return salesListReply(detectSpan(t));
-        }
-
-        // "what's low" (but not "sold") → alert list
-        if (/(what'?s|what is|whats).*(low|short|running out)|^(list )?low stock$|^alerts?$|^show alerts$/.test(t)) {
-          return lowStockReply();
-        }
-
-        // show inventory
-        if (/^(show|list|view) (inventory|stock|items)$|^inventory( report)?$|^show( me)?( the)? stock$/.test(t)) {
-          return inventoryReply();
-        }
-
-        // detailed create/update: "add item hammer, qty 20, price 9.5, category tools"
-        m = text.match(/^add item (.+)$/i);
-        if (m) {
-          const parts = m[1].split(",").map((s) => s.trim()).filter(Boolean);
-          const name = parts[0];
-          if (!name) return '🤔 What\'s the item name? e.g. "add item hammer, qty 20"';
-          let qty = 0, price = 0, threshold = DEFAULT_THRESHOLD, category, description;
-          for (const p of parts.slice(1)) {
-            let mm;
-            if ((mm = p.match(/^q(?:ty|uantity)?\s*(\d+(?:\.\d+)?)$/i))) qty = Math.round(Number(mm[1]));
-            else if ((mm = p.match(/^price\s*(\d+(?:\.\d+)?)$/i))) price = Number(mm[1]);
-            else if ((mm = p.match(/^(?:low|threshold|alert)\s*(?:at|:)?\s*(\d+)$/i))) threshold = Math.round(Number(mm[1]));
-            else if ((mm = p.match(/^(?:cat|category)\s+(.+)$/i))) category = titleCase(mm[1]);
-            else if ((mm = p.match(/^(?:desc|description|note)\s*[:=]?\s*(.+)$/i))) description = mm[1].trim();
-            else if ((mm = p.match(/^(\d+(?:\.\d+)?)$/))) qty = Math.round(Number(mm[1]));
-          }
-          const target = resolveItem(name);
-          if (target.exists) {
-            if (qty) target.item.qty = qty;
-            target.item.price = price || target.item.price;
-            target.item.threshold = threshold;
-            if (category) target.item.category = category;
-            if (description) target.item.description = description;
+      const ROUTES = [
+        {
+          match: (x, t) => /^(help|what can you do\??|commands\??)$/.test(t),
+          run: helpReply,
+        },
+        {
+          help: '• "profit this week" — revenue minus per-item cost',
+          match: (x, t) => /profit|margin/.test(t),
+          run: (x, t) => profitReply(detectSpan(t)),
+        },
+        {
+          help: '• "daily report" / "weekly report" / "monthly report"',
+          match: (x, t) => t.includes("report"),
+          run: (x, t) => reportReply(detectSpan(t)),
+        },
+        {
+          help: '• "what sold today?" / "top items this week"',
+          match: (x, t) =>
+            ((t.startsWith("what") || t.startsWith("which")) && t.includes("sold")) ||
+            t.startsWith("sales") || t.startsWith("sold items") ||
+            t.startsWith("top ") || t.startsWith("most used") ||
+            ((t.startsWith("show ") || t.startsWith("list ")) && (t.includes("sales") || t.includes("sold"))) ||
+            ((t.startsWith("how many") || t.startsWith("how much")) && /\b(sold|sell|sales)\b/.test(t) && /\b(today|yesterday|week|month)\b/.test(t)),
+          run: (x, t) => salesListReply(detectSpan(t)),
+        },
+        {
+          help: '• "what\'s low?"',
+          match: (x, t) => /(what'?s|what is|whats).*(low|short|running out)|^(list )?low stock$|^alerts?$|^show alerts$/.test(t),
+          run: () => lowStockReply(),
+        },
+        {
+          help: '• "show inventory"',
+          match: (x, t) => /^(show|list|view) (inventory|stock|items)$|^inventory( report)?$|^show( me)?( the)? stock$/.test(t),
+          run: () => inventoryReply(),
+        },
+        {
+          help: '• "add item hammer, qty 20, price 9.5, desc for counter use"',
+          match: (text) => text.match(/^add item (.+)$/i),
+          run: runAddItemDetail,
+        },
+        {
+          help: '• "add 10 pens" — add a new item or stock',
+          match: (x, t) => t.match(/^(?:add|restock|stock|refill|order)\s+(\d+)\s+(?:more\s+)?(?:to\s+|of\s+)?(.+?)(?:\s+to (?:the )?(?:inventory|stock))?$/),
+          run: (m) => {
+            const qty = parseInt(m[1], 10);
+            const it = findItem(m[2]);
+            if (it) {
+              it.qty += qty;
+              saveAll();
+              maybeAlert(it);
+              return `✅ Added ${qty} ${qty === 1 ? "unit" : "units"} to "${it.name}" — now ${it.qty} in stock.`;
+            }
+            return createItem(m[2], qty);
+          },
+        },
+        {
+          match: (x, t) => t.match(/^(.+?)\s*\+\s*(\d+)$/),
+          run: (m) => {
+            const it = findItem(m[1]);
+            if (!it) return; // fall through: not an item
+            it.qty += parseInt(m[2], 10);
             saveAll();
-            return `✅ Updated "${target.item.name}" — now ${target.item.qty} in stock.`;
-          }
-          return createItem(name, qty, price, threshold, category, description);
-        }
-
-        // add: "add 10 pens" / "add 5 to pens" / "restock 5 pens" / "refill 20 pens"
-        m = t.match(/^(?:add|restock|stock|refill|order)\s+(\d+)\s+(?:more\s+)?(?:to\s+|of\s+)?(.+?)(?:\s+to (?:the )?(?:inventory|stock))?$/);
-        if (m) {
-          const qty = parseInt(m[1], 10);
-          const target = resolveItem(m[2]);
-          if (target.exists) {
-            target.item.qty += qty;
+            maybeAlert(it);
+            return `✅ "${it.name}" is now ${it.qty}.`;
+          },
+        },
+        {
+          help: '• "used 2 pens for store" — took from stock for the shop itself (no sale)',
+          match: (x, t) => t.match(/^(?:used|use|took|consume[d]?|damaged?)\s+(\d+)\s+(?:units?\s+)?(?:of\s+)?(.+?)\s+(?:for|in|on)\s+(?:the )?(?:store|shop|display|demos?|office|internal|own use|testing)$/),
+          run: (m) => {
+            const it = findItem(m[2]);
+            if (!it) return `🤔 I couldn't find "${m[2]}". Try "show inventory".`;
+            return takeStock(it, parseInt(m[1], 10), "use");
+          },
+        },
+        {
+          match: (x, t) => t.match(/^(.+?)\s+used\s+(?:in|for)\s+(?:the\s+)?(?:store|shop|display)$/),
+          run: (m) => {
+            const it = findItem(m[1]);
+            if (!it) return; // fall through: not an item
+            return `How many were used? e.g. "used 2 ${it.name.toLowerCase()} for store" — currently ${it.qty} in stock.`;
+          },
+        },
+        {
+          help: '• "sold 2 pens and 3 notebooks" — multi-item sale (asks to confirm)',
+          match: (x, t) => t.match(/^(?:sold|sell|remove|subtract)\s+(\d+)\s+(.+?)\s+and\s+(\d+)\s+(.+)$/),
+          run: (m) => {
+            const a = findItem(m[2]), b = findItem(m[4]);
+            if (!a && !b) return; // fall through: probably not items
+            const q1 = parseInt(m[1], 10), q2 = parseInt(m[3], 10);
+            return confirmFirst(`Sell ${q1} × ${a?.name ?? m[2]} and ${q2} × ${b?.name ?? m[4]}?`, () => {
+              const r1 = a ? takeStock(a, q1, "sale") : `🤔 No item called "${m[2]}".`;
+              const r2 = b ? takeStock(b, q2, "sale") : `🤔 No item called "${m[4]}".`;
+              return `${r1}\n${r2}`;
+            });
+          },
+        },
+        {
+          help: '• "sold 3 pens" — record a sale (stock −3)',
+          match: (x, t) =>
+            t.match(/^(?:sold|sell|sells|remove|subtract|deduct|reduce|use)\s+(\d+)\s+(?:units?\s+)?(?:of\s+)?(.+?)(?:\s+from (?:the )?(?:inventory|stock))?$/) ||
+            t.match(/^(?:sold|sell|sells|remove|subtract|deduct|reduce|use)\s+(\d+)\s+from\s+(.+)$/),
+          run: (m) => {
+            const it = findItem(m[2]);
+            if (!it) return `🤔 I couldn't find "${m[2]}". Try "show inventory" to see all items.`;
+            return takeStock(it, parseInt(m[1], 10), "sale");
+          },
+        },
+        {
+          help: '• "set price xiaomi 5a combo 1500 each" — change an item\'s price',
+          match: (text) => text.match(/^(?:set |put )?price (?:of |for )?(.+?) (?:to |=|:)?\s*(\d+(?:\.\d+)?)\s*(?:each|per unit|rs\.?|inr)?$/i),
+          run: (m) => {
+            const it = findItem(m[1]);
+            if (!it) return `🤔 No item called "${m[1]}". Try "show inventory".`;
+            it.price = Number(m[2]);
             saveAll();
-            maybeAlert(target.item);
-            return `✅ Added ${qty} ${qty === 1 ? "unit" : "units"} to "${target.item.name}" — now ${target.item.qty} in stock.`;
-          }
-          return createItem(m[2], qty);
-        }
-
-        // "pens +5"
-        m = t.match(/^(.+?)\s*\+\s*(\d+)$/);
-        if (m) {
-          const target = resolveItem(m[1]);
-          if (target.exists) {
-            target.item.qty += parseInt(m[2], 10);
+            render();
+            return `✅ Price of "${it.name}" set to ${money(it.price)}.`;
+          },
+        },
+        {
+          help: '• "set pens to 25" — set exact quantity',
+          match: (x, t) => t.match(/^(?:set|update|change)\s+(.+?)\s+(?:to|=|:)\s*(\d+)$/) || t.match(/^(.+?)\s*(?:=|:)\s*(\d+)$/),
+          run: (m) => {
+            const it = findItem(m[1]);
+            if (!it) return `🤔 I couldn't find "${m[1]}". Add it first with "add 10 ${m[1]}".`;
+            it.qty = parseInt(m[2], 10);
             saveAll();
-            maybeAlert(target.item);
-            return `✅ "${target.item.name}" is now ${target.item.qty}.`;
-          }
-        }
-
-        // store-use: "used 2 pens for store" / "use 1 pen for display" — stock out, NOT a sale
-        m = t.match(/^(?:used|use|took|consume[d]?|damaged?)\s+(\d+)\s+(?:units?\s+)?(?:of\s+)?(.+?)\s+(?:for|in|on)\s+(?:the )?(?:store|shop|display|demos?|office|internal|own use|testing)$/);
-        if (m) {
-          const qty = parseInt(m[1], 10);
-          const target = resolveItem(m[2]);
-          if (!target.exists) return `🤔 I couldn't find "${m[2]}". Try "show inventory".`;
-          if (target.item.qty < qty) return `⚠️ Only ${target.item.qty} of "${target.item.name}" in stock — can't take ${qty}.`;
-          target.item.qty -= qty;
-          recordMovement(target.item, qty, "use");
-          saveAll();
-          render();
-          maybeAlert(target.item);
-          return `🏪 Taken for store use: ${qty} × "${target.item.name}" — ${target.item.qty} left. (Logged as store use, not a sale.)`;
-        }
-
-        // store-use, item-first: "redmi 9a used in store" (no qty) → ask how many
-        m = t.match(/^(.+?)\s+used\s+(?:in|for)\s+(?:the\s+)?(?:store|shop|display)$/);
-        if (m) {
-          const target = resolveItem(m[1]);
-          if (target.exists) return `How many were used? e.g. "used 2 ${target.item.name.toLowerCase()} for store" — currently ${target.item.qty} in stock.`;
-        }
-
-        // subtract (a sale): "sold 3 pens" / "sell 3 pens" / "remove 3 pens" / "subtract 3 from pens"
-        m = t.match(/^(?:sold|sell|sells|remove|subtract|deduct|reduce|use)\s+(\d+)\s+(?:units?\s+)?(?:of\s+)?(.+?)(?:\s+from (?:the )?(?:inventory|stock))?$/) ||
-            t.match(/^(?:sold|sell|sells|remove|subtract|deduct|reduce|use)\s+(\d+)\s+from\s+(.+)$/);
-        if (m) {
-          const qty = parseInt(m[1], 10);
-          const target = resolveItem(m[2]);
-          if (!target.exists) return `🤔 I couldn't find "${m[2]}". Try "show inventory" to see all items.`;
-          if (target.item.qty < qty) return `⚠️ Only ${target.item.qty} of "${target.item.name}" in stock — can't remove ${qty}.`;
-          target.item.qty -= qty;
-          recordMovement(target.item, qty, "sale");
-          const st = statusOf(target.item);
-          saveAll();
-          maybeAlert(target.item);
-          const suffix = st === "out" ? " 🚨 Now OUT of stock!" : st === "low" ? " ⚠️ Low stock!" : "";
-          return `✅ Removed ${qty} from "${target.item.name}" — ${target.item.qty} left.${suffix}`;
-        }
-
-        // set price: "set/put price xiaomi 5a combo 1500 each" / "set price pens to 20" (before qty-set so "price X" isn't read as an item name)
-        m = text.match(/^(?:set |put )?price (?:of |for )?(.+?) (?:to |=|:)?\s*(\d+(?:\.\d+)?)\s*(?:each|per unit|rs\.?|inr)?$/i);
-        if (m) {
-          const target = resolveItem(m[1]);
-          if (!target.exists) return `🤔 No item called "${m[1]}". Try "show inventory".`;
-          target.item.price = Number(m[2]);
-          saveAll();
-          render();
-          return `✅ Price of "${target.item.name}" set to ${money(target.item.price)}.`;
-        }
-
-        // set exact qty: "set pens to 25" / "pens = 25" / "update pens to 25"
-        m = t.match(/^(?:set|update|change)\s+(.+?)\s+(?:to|=|:)\s*(\d+)$/) || t.match(/^(.+?)\s*(?:=|:)\s*(\d+)$/);
-        if (m) {
-          const name = m[1];
-          const qty = parseInt(m[2], 10);
-          const target = resolveItem(name);
-          if (!target.exists) return `🤔 I couldn't find "${name}". Add it first with "add 10 ${name}".`;
-          target.item.qty = qty;
-          saveAll();
-          maybeAlert(target.item);
-          render();
-          return `✅ "${target.item.name}" set to ${qty}.`;
-        }
-
-        // query: "how many pens" / "stock of pens"
-        m = t.match(/^(?:how many|how much|check|stock of|quantity of|qty of)\s+(.+?)(?:\s+do (?:we|i) (?:have|got)\??)?$/) ||
-            t.match(/^(?:how many|how much)\s+(.+?)\s+do (?:we|i) have\??$/);
-        if (m) {
-          const target = resolveItem(m[1]);
-          if (target.exists) {
-            const st = statusOf(target.item);
-            const note = st === "out" ? " — OUT of stock 🚨" : st === "low" ? " — low stock ⚠️" : "";
-            return `📦 "${target.item.name}": ${target.item.qty} units${note}`;
-          }
-          return `🤔 No item called "${m[1]}". Try "show inventory" or "add 10 ${m[1]}".`;
-        }
-
-        // delete: "delete pens" / "remove item pens"
-        m = t.match(/^(?:delete|remove item|del)\s+(.+)$/);
-        if (m) {
-          const target = resolveItem(m[1]);
-          if (!target.exists) return `🤔 No item called "${m[1]}".`;
-          state.items = state.items.filter((x) => x._id !== target.item._id);
-          saveAll();
-          deleteFromCloud("items", target.item._id);
-          return `🗑️ Deleted "${target.item.name}".`;
-        }
-
-        // "desc pens" — show description
-        m = t.match(/^(?:desc|description|details?|info)(?: of| for)?\s+(.+)$/);
-        if (m) {
-          const target = resolveItem(m[1]);
-          if (!target.exists) return `🤔 No item called "${m[1]}".`;
-          const it = target.item;
-          const bits = [`📦 "${it.name}": ${it.qty} in stock @ ${money(it.price ?? 0)}`];
-          if (it.category) bits.push(`Category: ${it.category}`);
-          bits.push(`Description: ${it.description || "—"}`);
-          return bits.join("\n");
-        }
-
-        // "set desc pens: counter display" — set description
-        m = text.match(/^(?:set )?(?:desc|description)(?: (?:of|for))?\s+(.+?)\s*[:=]\s*(.+)$/i);
-        if (m) {
-          const target = resolveItem(m[1]);
-          if (!target.exists) return `🤔 No item called "${m[1]}".`;
-          target.item.description = m[2].trim();
-          saveAll();
-          render();
-          return `✅ Description of "${target.item.name}" set.`;
-        }
-
-        // "sell" with no number: "sell pens" → ask for the amount
-        m = t.match(/^(?:sold|sell|sells|remove|subtract|deduct|reduce|use)\s+(.+)$/);
-        if (m) {
-          const target = resolveItem(m[1]);
-          if (target.exists) {
-            const it = target.item;
+            maybeAlert(it);
+            render();
+            return `✅ "${it.name}" set to ${it.qty}.`;
+          },
+        },
+        {
+          help: '• "how many pens do we have?"',
+          match: (x, t) =>
+            t.match(/^(?:how many|how much|check|stock of|quantity of|qty of)\s+(.+?)(?:\s+do (?:we|i) (?:have|got)\??)?$/) ||
+            t.match(/^(?:how many|how much)\s+(.+?)\s+do (?:we|i) have\??$/),
+          run: (m) => {
+            const it = findItem(m[1]);
+            if (!it) return `🤔 No item called "${m[1]}". Try "show inventory" or "add 10 ${m[1]}".`;
+            return `📦 "${it.name}": ${it.qty} units${stockNote(it)}`;
+          },
+        },
+        {
+          help: '• "delete all" — wipe every item (asks to confirm)',
+          match: (x, t) => /^(?:delete|del|remove|clear|wipe)\s+(?:all|everything|the whole inventory|entire inventory)$|^clear inventory$/.test(t),
+          run: () => {
+            if (!state.items.length) return "Inventory is already empty — nothing to delete.";
+            return confirmFirst(`Delete ALL ${state.items.length} items? This cannot be undone.`, () => {
+              const ids = state.items.map((it) => it._id);
+              for (const id of ids) removeItem(id);
+              return `🗑️ Deleted all ${ids.length} items.`;
+            });
+          },
+        },
+        {
+          help: '• "delete pens"',
+          match: (x, t) => t.match(/^(?:delete|remove item|del)\s+(.+)$/),
+          run: (m) => {
+            const it = findItem(m[1]);
+            if (!it) return `🤔 No item called "${m[1]}".`;
+            removeItem(it._id);
+            return `🗑️ Deleted "${it.name}".`;
+          },
+        },
+        {
+          help: '• "desc pens" — show description; "set desc pens: display unit" — set it',
+          match: (x, t) => t.match(/^(?:desc|description|details?|info)(?: of| for)?\s+(.+)$/),
+          run: (m) => {
+            const it = findItem(m[1]);
+            if (!it) return `🤔 No item called "${m[1]}".`;
+            const bits = [`📦 "${it.name}": ${it.qty} in stock @ ${money(it.price ?? 0)}`];
+            if (it.category) bits.push(`Category: ${it.category}`);
+            bits.push(`Description: ${it.description || "—"}`);
+            return bits.join("\n");
+          },
+        },
+        {
+          match: (text) => text.match(/^(?:set )?(?:desc|description)(?: (?:of|for))?\s+(.+?)\s*[:=]\s*(.+)$/i),
+          run: (m) => {
+            const it = findItem(m[1]);
+            if (!it) return `🤔 No item called "${m[1]}".`;
+            it.description = m[2].trim();
+            saveAll();
+            render();
+            return `✅ Description of "${it.name}" set.`;
+          },
+        },
+        {
+          match: (x, t) => t.match(/^(?:sold|sell|sells|remove|subtract|deduct|reduce|use)\s+(.+)$/),
+          run: (m) => {
+            const it = findItem(m[1]);
+            if (!it) return; // fall through: not an item
             return `How many? e.g. "sold 3 ${it.name}" — currently ${it.qty} in stock.`;
-          }
-        }
+          },
+        },
+        {
+          match: (x, t) => (state.items.length ? findItem(t) : null),
+          run: (it) => `📦 "${it.name}": ${it.qty} units${stockNote(it)}`,
+        },
+        {
+          match: () => ({}),
+          run: () =>
+            [
+              "🤔 I didn't quite get that. Examples:",
+              '• "add 10 pens"',
+              '• "sold 3 pens"',
+              '• "set pens to 25"',
+              '• "what\'s low?"',
+              '• "how many hammers do we have?"',
+              'Type "help" for the full list.',
+            ].join("\n"),
+        },
+      ];
 
-        // fallback: bare item name → report stock
-        if (state.items.length) {
-          const target = resolveItem(t);
-          if (target.exists) {
-            const st = statusOf(target.item);
-            const note = st === "out" ? " — OUT of stock 🚨" : st === "low" ? " — low stock ⚠️" : "";
-            return `📦 "${target.item.name}": ${target.item.qty} units${note}`;
-          }
-        }
+      // Confirmation gate: destructive routes arm a pending action instead of
+      // executing; the next message must confirm (yes) or cancel (no).
+      let pendingConfirm = null;
+      function confirmFirst(describe, execute) {
+        pendingConfirm = { describe, execute };
+        return `⚠️ ${describe}\nReply "yes" to confirm or "no" to cancel.`;
+      }
 
-        return [
-          "🤔 I didn't quite get that. Examples:",
-          '• "add 10 pens"',
-          '• "sold 3 pens"',
-          '• "set pens to 25"',
-          '• "what\'s low?"',
-          '• "how many hammers do we have?"',
-          'Type "help" for the full list.',
-        ].join("\n");
+      function handleCommand(raw) {
+        const text = String(raw ?? "").trim();
+        if (!text) return 'Type a command, e.g. "add 10 pens" — or "help" for the list.';
+        const t = text.toLowerCase();
+        if (pendingConfirm) {
+          if (/^(?:y|yes|yeah|yep|ok|okay|sure|confirm|do it|go ahead)\b/.test(t)) {
+            const execute = pendingConfirm.execute;
+            pendingConfirm = null;
+            return execute();
+          }
+          if (/^(?:n|no|nah|nope|cancel|stop|never ?mind)\b/.test(t)) {
+            pendingConfirm = null;
+            return "Cancelled — nothing changed.";
+          }
+          return `Still waiting on: ${pendingConfirm.describe}\nReply "yes" to confirm or "no" to cancel.`;
+        }
+        for (const route of ROUTES) {
+          const params = route.match(text, t);
+          if (!params) continue;
+          const reply = route.run(params, t);
+          if (reply !== undefined) return reply;
+        }
       }
 
       // ================= Keyboard shortcuts =================

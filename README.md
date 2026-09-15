@@ -53,7 +53,7 @@ Open `index.html` in any browser — that's it. No build, no install, no server 
 Notes:
 
 - Your existing local inventory is **imported automatically** into your first cloud store on first sign-in (if the store is empty).
-- All changes sync to the cloud as you make them and are also cached in this browser, so the app keeps working offline and catches up on the next change.
+- All changes sync to the cloud as you make them — items, sales, **and the assistant conversation**, so your chat history follows you to any device you sign in on — and are also cached in this browser, so the app keeps working offline and catches up on the next change.
 - **Log out** is in the header; **☁️ Sign in** brings the screen back. "Continue without cloud" keeps everything local on this browser only.
 - Signing in on **another device or browser** with the same email shows the same stores and data.
 - To add a store beyond the first: click **＋ Store** in the header. Each store starts empty with its own items, sales, reports, and currency — the database supports unlimited stores per account.
