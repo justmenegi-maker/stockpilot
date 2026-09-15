@@ -1,0 +1,1543 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StockPilot — Inventory MVP</title>
+    <style>
+      :root {
+        --bg: #f6f7fb;
+        --panel: #ffffff;
+        --ink: #0f172a;
+        --muted: #64748b;
+        --line: #e2e8f0;
+        --brand: #4f46e5;
+        --brand-ink: #ffffff;
+        --ok: #16a34a;
+        --warn: #b45309;
+        --danger: #dc2626;
+        --radius: 14px;
+      }
+      [data-theme="dark"] {
+        --bg: #0b1220;
+        --panel: #111a2e;
+        --ink: #e2e8f0;
+        --muted: #94a3b8;
+        --line: #1e293b;
+        --brand: #818cf8;
+        --brand-ink: #0b1220;
+        --ok: #4ade80;
+        --warn: #fbbf24;
+        --danger: #f87171;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+        transition: background 0.2s, color 0.2s;
+      }
+      header {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px clamp(12px, 3vw, 24px);
+        background: var(--panel);
+        border-bottom: 1px solid var(--line);
+        flex-wrap: wrap;
+      }
+      .logo {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 800;
+        font-size: 18px;
+        letter-spacing: -0.02em;
+      }
+      .logo-box {
+        width: 30px;
+        height: 30px;
+        border-radius: 9px;
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        display: grid;
+        place-items: center;
+        color: white;
+        font-size: 15px;
+      }
+      .spacer { flex: 1; }
+      .header-actions { display: flex; gap: 8px; align-items: center; }
+      .alert-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+        background: #fef2f2;
+        color: var(--danger);
+        border: 1px solid #fecaca;
+        cursor: pointer;
+      }
+      [data-theme="dark"] .alert-badge { background: #450a0a; border-color: #7f1d1d; }
+      .alert-badge:hover { filter: brightness(1.05); }
+      main { max-width: 1150px; margin: 0 auto; padding: clamp(12px, 3vw, 24px); padding-bottom: 96px; }
+      .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 16px; }
+      @media (max-width: 760px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+      .stat {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 14px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .stat .label { font-size: 11px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+      .stat .value { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+      .value.ok { color: var(--ok); }
+      .value.danger { color: var(--danger); }
+      .toolbar { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+      .search {
+        flex: 1;
+        min-width: 200px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 0 12px;
+      }
+      .search input {
+        flex: 1;
+        border: none;
+        outline: none;
+        background: transparent;
+        color: var(--ink);
+        padding: 11px 0;
+        font-size: 14px;
+      }
+      select, input[type="number"] {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 10px 12px;
+        color: var(--ink);
+        font-size: 14px;
+        outline: none;
+      }
+      select:focus, input:focus { border-color: var(--brand); }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border: 1px solid var(--line);
+        background: var(--panel);
+        color: var(--ink);
+        border-radius: var(--radius);
+        padding: 10px 14px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.05s, border-color 0.15s;
+      }
+      .btn:hover { border-color: var(--brand); }
+      .btn:active { transform: scale(0.97); }
+      .btn.primary { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
+      .btn.primary:hover { filter: brightness(1.08); }
+      .btn.ghost { border-color: transparent; background: transparent; }
+      .btn.icon { padding: 8px 10px; }
+      .table-wrap {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        overflow-x: auto;
+      }
+      table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 640px; }
+      thead th {
+        text-align: left;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--muted);
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--line);
+        white-space: nowrap;
+      }
+      tbody td { padding: 12px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+      tbody tr:last-child td { border-bottom: none; }
+      tbody tr:hover { background: color-mix(in srgb, var(--panel) 70%, var(--bg)); }
+      .item-name { font-weight: 700; }
+      .item-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+      td.qty { font-weight: 800; font-variant-numeric: tabular-nums; }
+      .status {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 999px;
+        white-space: nowrap;
+      }
+      .status.ok { background: #f0fdf4; color: var(--ok); }
+      .status.low { background: #fffbeb; color: var(--warn); }
+      .status.out { background: #fef2f2; color: var(--danger); }
+      [data-theme="dark"] .status.ok { background: #052e16; }
+      [data-theme="dark"] .status.low { background: #451a03; }
+      [data-theme="dark"] .status.out { background: #450a0a; }
+      .qty-controls { display: flex; gap: 6px; }
+      .qty-controls .btn { padding: 5px 10px; border-radius: 9px; font-size: 13px; }
+      .row-actions { display: flex; gap: 2px; justify-content: flex-end; }
+      .empty { padding: 48px 16px; text-align: center; color: var(--muted); }
+      .empty .big { font-size: 34px; margin-bottom: 8px; }
+      .fab-chat {
+        position: fixed;
+        right: 18px;
+        bottom: 18px;
+        z-index: 40;
+        width: 56px;
+        height: 56px;
+        border-radius: 999px;
+        border: none;
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        color: white;
+        font-size: 24px;
+        cursor: pointer;
+        box-shadow: 0 10px 24px rgba(79, 70, 229, 0.35);
+        display: grid;
+        place-items: center;
+        transition: transform 0.15s;
+      }
+      .fab-chat:hover { transform: scale(1.06); }
+      .chat-panel {
+        position: fixed;
+        right: 18px;
+        bottom: 18px;
+        z-index: 50;
+        width: min(400px, calc(100vw - 24px));
+        height: min(560px, calc(100vh - 60px));
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        box-shadow: 0 18px 48px rgba(2, 6, 23, 0.25);
+        animation: pop 0.18s ease-out;
+      }
+      @keyframes pop { from { transform: translateY(12px) scale(0.98); opacity: 0; } to { transform: none; opacity: 1; } }
+      .chat-head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--line);
+        background: color-mix(in srgb, var(--brand) 8%, var(--panel));
+      }
+      .chat-head .avatar {
+        width: 34px; height: 34px; border-radius: 10px;
+        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        display: grid; place-items: center; color: white; font-size: 17px;
+        flex-shrink: 0;
+      }
+      .chat-head .title { font-weight: 800; font-size: 14px; }
+      .chat-head .sub { font-size: 11px; color: var(--muted); }
+      .chat-msgs { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+      .msg { max-width: 88%; padding: 9px 12px; border-radius: 14px; font-size: 13.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+      .msg.bot { align-self: flex-start; background: color-mix(in srgb, var(--panel) 55%, var(--bg)); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+      .msg.user { align-self: flex-end; background: var(--brand); color: var(--brand-ink); border-bottom-right-radius: 4px; }
+      .chat-chips { display: flex; gap: 6px; padding: 0 14px 10px; flex-wrap: wrap; }
+      .chip {
+        font-size: 12px;
+        padding: 5px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: transparent;
+        color: var(--muted);
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      .chip:hover { color: var(--brand); border-color: var(--brand); }
+      .chat-input-row { display: flex; gap: 8px; padding: 10px 12px 12px; border-top: 1px solid var(--line); }
+      .chat-input-row input {
+        flex: 1;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 10px 12px;
+        background: var(--panel);
+        color: var(--ink);
+        font-size: 14px;
+        outline: none;
+        min-width: 0;
+      }
+      .chat-input-row input:focus { border-color: var(--brand); }
+      .chat-send {
+        border: none;
+        background: var(--brand);
+        color: var(--brand-ink);
+        border-radius: 12px;
+        width: 42px;
+        cursor: pointer;
+        font-size: 16px;
+      }
+      .chat-send:hover { filter: brightness(1.08); }
+      dialog {
+        border: none;
+        border-radius: var(--radius);
+        background: var(--panel);
+        color: var(--ink);
+        padding: 0;
+        width: min(460px, calc(100vw - 24px));
+      }
+      dialog::backdrop { background: rgba(2, 6, 23, 0.5); }
+      .dialog-body { padding: 20px; max-height: calc(100vh - 48px); overflow-y: auto; }
+      .dialog-body h3 { margin: 0 0 4px; font-size: 17px; letter-spacing: -0.01em; }
+      .dialog-body p { margin: 0 0 16px; font-size: 13px; color: var(--muted); }
+      .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; flex: 1; }
+      .field label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+      .field input {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px 12px;
+        font-size: 14px;
+        background: var(--panel);
+        color: var(--ink);
+        outline: none;
+        width: 100%;
+      }
+      .field input:focus { border-color: var(--brand); }
+      .field-row { display: flex; gap: 10px; }
+      .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 6px; }
+      .hint { font-size: 12px; color: var(--muted); margin-top: 14px; }
+      kbd {
+        background: color-mix(in srgb, var(--panel) 55%, var(--bg));
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 1px 6px;
+        font-size: 11px;
+        font-family: inherit;
+      }
+      /* toast */
+      #toastWrap { position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%); z-index: 100; display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none; }
+      .toast {
+        background: var(--ink);
+        color: var(--bg);
+        padding: 10px 16px;
+        border-radius: 12px;
+        font-size: 13px;
+        font-weight: 600;
+        max-width: min(480px, calc(100vw - 32px));
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+        opacity: 0;
+        transform: translateY(6px);
+        transition: opacity 0.18s, transform 0.18s;
+      }
+      .toast.show { opacity: 1; transform: none; }
+
+      /* ================= Cloud / auth ================= */
+      .hidden { display: none !important; }
+      #authBackdrop {
+        position: fixed; inset: 0; z-index: 60;
+        background: color-mix(in srgb, var(--bg) 82%, transparent);
+        backdrop-filter: blur(6px);
+        display: flex; align-items: center; justify-content: center; padding: 16px;
+      }
+      .auth-card {
+        width: 100%; max-width: 360px; background: var(--card); border: 1px solid var(--border);
+        border-radius: 14px; padding: 22px; box-shadow: var(--shadow);
+      }
+      .auth-card h2 { margin: 0 0 4px; font-size: 18px; }
+      .auth-card .sub { color: var(--muted); font-size: 12.5px; margin: 0 0 14px; }
+      .auth-card .field { margin-bottom: 10px; text-align: left; }
+      .auth-card .field label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; }
+      .auth-card .field input, .auth-card .field textarea {
+        width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border);
+        border-radius: 8px; padding: 9px 10px; font: inherit;
+      }
+      .auth-card .err { color: #e5484d; font-size: 12.5px; margin: 6px 0 0; white-space: pre-wrap; }
+      .auth-card .note { color: var(--muted); font-size: 12px; margin-top: 12px; line-height: 1.45; }
+      .auth-note { font-size: 11.5px; color: var(--muted); margin-left: 6px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="logo"><div class="logo-box">📦</div> StockPilot</div>
+      <div class="spacer"></div>
+      <div class="header-actions">
+        <button class="btn ghost" id="signinBtn" title="Sign in / cloud settings">☁️ Sign in</button>
+        <select id="storeSelect" aria-label="Store" title="Store" style="display:none"></select>
+        <button class="btn ghost" id="addStoreBtn" title="Add another store" style="display:none">＋ Store</button>
+        <button class="btn ghost" id="logoutBtn" title="Sign out" style="display:none">Log out</button>
+        <select id="currencySelect" aria-label="Currency" title="Currency"></select>
+        <button class="alert-badge" id="alertBadge" title="Show low-stock items" style="display:none"></button>
+        <button class="btn icon" id="themeBtn" title="Toggle theme">🌙</button>
+        <button class="btn primary" id="addItemBtn">+ Add Item</button>
+      </div>
+    </header>
+
+    <main>
+      <div class="stats">
+        <div class="stat"><span class="label">Total Items</span><span class="value" id="statTotal">0</span></div>
+        <div class="stat"><span class="label">Units in Stock</span><span class="value" id="statUnits">0</span></div>
+        <div class="stat"><span class="label">Stock Value</span><span class="value" id="statValue">$0</span></div>
+        <div class="stat"><span class="label">Low / Out of Stock</span><span class="value danger" id="statLow">0</span></div>
+        <div class="stat"><span class="label">Sold Today</span><span class="value ok" id="statSoldToday">0</span></div>
+      </div>
+
+      <div class="toolbar">
+        <div class="search">🔎 <input id="searchInput" placeholder="Search items…" /></div>
+        <select id="filterSelect" aria-label="Filter">
+          <option value="all">All items</option>
+          <option value="low">Low stock</option>
+          <option value="out">Out of stock</option>
+        </select>
+        <select id="sortSelect" aria-label="Sort">
+          <option value="name">Sort: Name</option>
+          <option value="qty-asc">Sort: Qty low→high</option>
+          <option value="qty-desc">Sort: Qty high→low</option>
+        </select>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Item</th><th>Qty</th><th>Status</th><th>Stock Value</th><th>Adjust</th><th></th></tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+        <div class="empty" id="emptyState" style="display:none">
+          <div class="big">📦</div>
+          <p><b>No items match.</b><br/>Use “+ Add Item”, or just ask the assistant: “add 10 pens”</p>
+        </div>
+      </div>
+      <p class="hint">Data is saved in your browser (localStorage). Shortcuts: <kbd>N</kbd> add item · <kbd>/</kbd> open assistant.</p>
+    </main>
+
+    <button class="fab-chat" id="chatFab" title="Open assistant ( / )">💬</button>
+
+    <div class="chat-panel" id="chatPanel" style="display:none">
+      <div class="chat-head">
+        <div class="avatar">🤖</div>
+        <div>
+          <div class="title">StockPilot Assistant</div>
+          <div class="sub">“add 10 pens” · “sold 3 pens” · “what's low?”</div>
+        </div>
+        <div class="spacer"></div>
+        <button class="btn ghost icon" id="chatClose" title="Close">✕</button>
+      </div>
+      <div class="chat-msgs" id="chatMsgs"></div>
+      <div class="chat-chips" id="chatChips"></div>
+      <div class="chat-input-row">
+        <input id="chatInput" placeholder='e.g. "add 12 hammers" or "sold 2 hammers"' autocomplete="off" />
+        <button class="chat-send" id="chatSend" title="Send">➤</button>
+      </div>
+    </div>
+
+    <dialog id="itemDialog">
+      <div class="dialog-body">
+        <h3 id="dialogTitle">Add Item</h3>
+        <p id="dialogSub">Create a new inventory item.</p>
+        <div class="field"><label>Name</label><input id="fName" placeholder="e.g. Wireless Mouse" /></div>
+        <div class="field"><label>Description (optional)</label><input id="fDesc" placeholder="e.g. used for store display too" /></div>
+        <div class="field-row">
+          <div class="field"><label>Quantity</label><input id="fQty" type="number" min="0" step="1" value="0" /></div>
+          <div class="field"><label>Alert at (low-stock)</label><input id="fThreshold" type="number" min="0" step="1" value="5" /></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Unit price</label><input id="fPrice" type="number" min="0" step="0.01" value="0" /></div>
+          <div class="field"><label>Category (optional)</label><input id="fCategory" placeholder="e.g. Electronics" /></div>
+        </div>
+        <div class="dialog-actions">
+          <button class="btn" id="dialogCancel">Cancel</button>
+          <button class="btn primary" id="dialogSave">Save</button>
+        </div>
+      </div>
+    </dialog>
+
+    <div id="authBackdrop" style="display:none">
+      <div class="auth-card">
+        <h2 id="authTitle">☁️ Sign in to StockPilot</h2>
+        <p class="sub" id="authSub">One account, all your stores — data saved in the cloud.</p>
+        <div id="cfgFields">
+          <div class="field"><label>Supabase project URL</label><input id="cfgUrl" placeholder="https://xxxx.supabase.co" /></div>
+          <div class="field"><label>Supabase anon key (public)</label><textarea id="cfgKey" rows="3" placeholder="eyJ…"></textarea></div>
+          <p class="note">First time? Create a free project at <b>supabase.com</b>, run <b>supabase-setup.sql</b> (from this folder) in its SQL Editor, then paste the URL + anon key here. Both are in your project's Settings → API.</p>
+        </div>
+        <div id="authFields">
+          <div class="field"><label>Email</label><input id="authEmail" type="email" placeholder="you@example.com" /></div>
+          <div class="field"><label>Password</label><input id="authPass" type="password" placeholder="••••••••" /></div>
+          <div class="field" id="storeNameField"><label>First store name (you can add more later)</label><input id="storeName" placeholder="e.g. Main Shop" /></div>
+        </div>
+        <p class="err" id="authErr" style="display:none"></p>
+        <div class="dialog-actions">
+          <button class="btn" id="cfgSave">Save cloud settings</button>
+          <button class="btn primary" id="authSubmit">Sign in</button>
+        </div>
+        <div class="dialog-actions">
+          <button class="btn ghost" id="authToggle">Need an account? Sign up</button>
+          <button class="btn ghost" id="offlineBtn">Continue without cloud</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="toastWrap"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <script>
+      "use strict";
+
+      // ================= Cloud (Supabase) =================
+      // Setup: free project at supabase.com, run supabase-setup.sql in its SQL Editor,
+      // paste the project URL + anon key. Without them the app runs offline-only.
+      const CFG_KEY = "stockpilot.cloud.cfg";
+      const CFG = loadCFG();
+      const SB_URL = (CFG.url || "").trim();
+      const SB_KEY = (CFG.key || "").trim();
+      const sb = SB_URL && SB_KEY && window.supabase ? window.supabase.createClient(SB_URL, SB_KEY) : null;
+      let cloudUser = null;      // signed-in user
+      let cloudStores = [];      // rows of public.stores for this user
+
+      function loadCFG() {
+        try { return JSON.parse(localStorage.getItem(CFG_KEY) || "{}"); } catch { return {}; }
+      }
+
+      // True when the active store is a signed-in cloud store (i.e. cloud reads/writes apply).
+      function cloudActive() {
+        return !!(sb && cloudUser && cloudStores.some((s) => s.id === state.storeId));
+      }
+
+      // ================= Store-scoped state =================
+      // Offline fallback prefix: "stockpilot.local.<storeId>". Cloud keys live in Supabase.
+      const LS_STORE = "stockpilot.local.";
+      const LS_LASTSTORE = "stockpilot.lastStore";
+      const LS_THEME = "stockpilot.theme";
+      const DEFAULT_THRESHOLD = 5;
+
+      function loadLS(key, fallback) {
+        try {
+          const raw = localStorage.getItem(key);
+          return raw ? JSON.parse(raw) : fallback;
+        } catch {
+          return fallback;
+        }
+      }
+
+      const GREETING = [
+        { role: "bot", text: '👋 Hi! I\'m your inventory assistant.\nTry:\n• "add 10 pens"\n• "sold 3 pens"\n• "set pens to 25"\n• "what\'s low?"' },
+      ];
+
+      const state = {
+        storeId: "local-default",
+        items: [],
+        sales: [],
+        currency: "USD",
+        chat: GREETING,
+        filter: "all",
+        sort: "name",
+        search: "",
+        editingId: null,
+      };
+
+      // Write-through cache: localStorage first (instant reloads), cloud best-effort.
+      function saveAll() {
+        localStorage.setItem(LS_STORE + state.storeId + ".items", JSON.stringify(state.items));
+        localStorage.setItem(LS_STORE + state.storeId + ".chat", JSON.stringify(state.chat.slice(-200)));
+        localStorage.setItem(LS_STORE + state.storeId + ".sales", JSON.stringify(state.sales));
+        if (cloudActive()) syncStoreToCloud().catch((e) => console.warn("cloud sync failed", e.message));
+      }
+
+      // Push the active store's data to Supabase (upsert; rows keyed by app-generated ids).
+      async function syncStoreToCloud() {
+        const sid = state.storeId;
+        const rows = state.items.map((it) => ({
+          id: it._id, user_id: cloudUser.id, store_id: sid, name: it.name, description: it.description,
+          category: it.category, qty: it.qty, price: it.price, threshold: it.threshold,
+          created_at: new Date(it.createdAt).toISOString(), updated_at: new Date().toISOString(),
+        }));
+        const salesRows = state.sales.map((s) => ({
+          id: s.id, user_id: cloudUser.id, store_id: sid, item_id: s.itemId, name: s.name,
+          qty: s.qty, price: s.price, kind: s.kind, ts: new Date(s.ts).toISOString(), date: s.date,
+        }));
+        const [r1, r2] = await Promise.all([
+          sb.from("items").upsert(rows),
+          sb.from("sales").upsert(salesRows),
+        ]);
+        if (r1.error) throw r1.error;
+        if (r2.error) throw r2.error;
+      }
+
+      // Pull a store's rows from Supabase into `state` (used on sign-in and store switch).
+      async function pullStoreFromCloud(storeId) {
+        const [{ data: items, error: e1 }, { data: sales, error: e2 }] = await Promise.all([
+          sb.from("items").select("*").eq("store_id", storeId),
+          sb.from("sales").select("*").eq("store_id", storeId),
+        ]);
+        if (e1) throw e1;
+        if (e2) throw e2;
+        state.storeId = storeId;
+        state.items = (items || []).map((r) => ({
+          _id: r.id, name: r.name, description: r.description || "", category: r.category || "",
+          qty: r.qty, price: Number(r.price), threshold: r.threshold, createdAt: Date.parse(r.created_at), // PostgREST returns numeric as a string
+        }));
+        state.sales = (sales || []).map((r) => ({
+          id: r.id, itemId: r.item_id, name: r.name, qty: r.qty, price: Number(r.price),
+          kind: r.kind, ts: Date.parse(r.ts), date: r.date,
+        }));
+        state.chat = loadLS(LS_STORE + storeId + ".chat", GREETING);
+        state.currency = cloudStores.find((s) => s.id === storeId)?.currency || "USD";
+      }
+
+      // Best-effort cloud delete — without it the next pull resurrects the deleted item.
+      async function deleteFromCloud(table, id) {
+        if (!cloudActive()) return;
+        try {
+          const { error } = await sb.from(table).delete().eq("id", id);
+          if (error) throw error;
+        } catch (e) { console.warn("cloud delete failed", e.message); }
+      }
+
+      function uid() {
+        return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+      }
+
+      function esc(s) {
+        return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+      }
+
+      // ================= Theme =================
+      function applyTheme() {
+        const saved = localStorage.getItem(LS_THEME);
+        const dark = saved ? saved === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+        document.documentElement.dataset.theme = dark ? "dark" : "light";
+        document.getElementById("themeBtn").textContent = dark ? "☀️" : "🌙";
+      }
+      document.getElementById("themeBtn").addEventListener("click", () => {
+        const dark = document.documentElement.dataset.theme !== "dark";
+        localStorage.setItem(LS_THEME, dark ? "dark" : "light");
+        applyTheme();
+      });
+
+      // ================= Status helpers =================
+      function statusOf(item) {
+        if (item.qty <= 0) return "out";
+        if (item.qty <= (item.threshold ?? DEFAULT_THRESHOLD)) return "low";
+        return "ok";
+      }
+      const STATUS_META = {
+        ok: { label: "In stock", cls: "ok" },
+        low: { label: "Low stock", cls: "low" },
+        out: { label: "Out of stock", cls: "out" },
+      };
+
+      // ================= Toasts =================
+      const toastWrap = document.getElementById("toastWrap");
+      function toast(msg, ms = 2600) {
+        const t = document.createElement("div");
+        t.className = "toast";
+        t.textContent = msg;
+        toastWrap.appendChild(t);
+        requestAnimationFrame(() => t.classList.add("show"));
+        setTimeout(() => {
+          t.classList.remove("show");
+          setTimeout(() => t.remove(), 220);
+        }, ms);
+      }
+
+      // ================= Rendering =================
+      const $ = (id) => document.getElementById(id);
+      const tbody = $("tbody");
+      const emptyState = $("emptyState");
+
+      function visibleItems() {
+        const q = state.search.trim().toLowerCase();
+        const list = state.items.filter((it) => {
+          const s = statusOf(it);
+          if (state.filter === "low" && s !== "low") return false;
+          if (state.filter === "out" && s !== "out") return false;
+          if (q && !(`${it.name} ${it.category ?? ""}`.toLowerCase().includes(q))) return false;
+          return true;
+        });
+        const cmp = {
+          name: (a, b) => a.name.localeCompare(b.name),
+          "qty-asc": (a, b) => a.qty - b.qty || a.name.localeCompare(b.name),
+          "qty-desc": (a, b) => b.qty - a.qty || a.name.localeCompare(b.name),
+        }[state.sort];
+        return list.sort(cmp);
+      }
+
+      function money(n) {
+        return n.toLocaleString(undefined, { style: "currency", currency: state.currency });
+      }
+
+      function render() {
+        const items = state.items;
+        const units = items.reduce((s, it) => s + it.qty, 0);
+        const value = items.reduce((s, it) => s + it.qty * (it.price ?? 0), 0);
+        const lowOut = items.filter((it) => statusOf(it) !== "ok");
+        $("statTotal").textContent = items.length;
+        $("statUnits").textContent = units;
+        $("statValue").textContent = money(value);
+        $("statLow").textContent = lowOut.length;
+        $("statSoldToday").textContent = state.sales.filter((s) => s.kind === "sale" && s.date === todayKey()).reduce((n, s) => n + s.qty, 0);
+
+        const badge = $("alertBadge");
+        if (lowOut.length > 0) {
+          const outs = lowOut.filter((it) => statusOf(it) === "out").length;
+          badge.style.display = "";
+          badge.textContent = `🔔 ${lowOut.length} alert${lowOut.length > 1 ? "s" : ""}${outs ? ` · ${outs} out` : ""}`;
+        } else {
+          badge.style.display = "none";
+        }
+
+        const list = visibleItems();
+        tbody.innerHTML = "";
+        emptyState.style.display = list.length === 0 ? "" : "none";
+        for (const it of list) {
+          const meta = STATUS_META[statusOf(it)];
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>
+              <div class="item-name">${esc(it.name)}</div>
+              ${it.category ? `<div class="item-sub">${esc(it.category)}</div>` : ""}
+              ${it.description ? `<div class="item-sub">${esc(it.description)}</div>` : ""}
+            </td>
+            <td class="qty">${it.qty}</td>
+            <td><span class="status ${meta.cls}">${meta.label}</span></td>
+            <td>${money(it.qty * (it.price ?? 0))}</td>
+            <td>
+              <div class="qty-controls">
+                <button class="btn" data-act="minus" data-id="${it._id}" title="Remove 1">−1</button>
+                <button class="btn" data-act="plus" data-id="${it._id}" title="Add 1">+1</button>
+              </div>
+            </td>
+            <td>
+              <div class="row-actions">
+                <button class="btn ghost icon" data-act="edit" data-id="${it._id}" title="Edit">✏️</button>
+                <button class="btn ghost icon" data-act="del" data-id="${it._id}" title="Delete">🗑️</button>
+              </div>
+            </td>`;
+          tbody.appendChild(tr);
+        }
+      }
+
+      // ================= Item CRUD (dialog) =================
+      function openDialog(item) {
+        state.editingId = item ? item._id : null;
+        $("dialogTitle").textContent = item ? "Edit Item" : "Add Item";
+        $("dialogSub").textContent = item ? "Update item details." : "Create a new inventory item.";
+        $("fName").value = item?.name ?? "";
+        $("fDesc").value = item?.description ?? "";
+        $("fQty").value = item?.qty ?? 0;
+        $("fThreshold").value = item?.threshold ?? DEFAULT_THRESHOLD;
+        $("fPrice").value = item?.price ?? 0;
+        $("fCategory").value = item?.category ?? "";
+        $("itemDialog").showModal();
+      }
+
+      $("dialogSave").addEventListener("click", () => {
+        const name = $("fName").value.trim();
+        if (!name) { toast("Item name is required"); $("fName").focus(); return; }
+        const qty = Math.max(0, Math.round(Number($("fQty").value) || 0));
+        const threshold = Math.max(0, Math.round(Number($("fThreshold").value) || 0));
+        const price = Math.max(0, Number($("fPrice").value) || 0);
+        const category = $("fCategory").value.trim() || undefined;
+        const description = $("fDesc").value.trim() || undefined;
+        const dup = state.items.find((it) => it.name.toLowerCase() === name.toLowerCase() && it._id !== state.editingId);
+        if (dup) { toast(`"${name}" already exists`); return; }
+
+        if (state.editingId) {
+          const it = state.items.find((x) => x._id === state.editingId);
+          if (it) Object.assign(it, { name, qty, threshold, price, category, description });
+          toast(`Updated "${name}"`);
+        } else {
+          state.items.push({ _id: uid(), name, qty, threshold, price, category, description, createdAt: Date.now() });
+          toast(`Added "${name}"`);
+        }
+        saveAll();
+        render();
+        $("itemDialog").close();
+      });
+      $("dialogCancel").addEventListener("click", () => $("itemDialog").close());
+      $("addItemBtn").addEventListener("click", () => openDialog(null));
+
+      // ================= Table actions =================
+      tbody.addEventListener("click", (e) => {
+        const btn = e.target.closest("button[data-act]");
+        if (!btn) return;
+        const it = state.items.find((x) => x._id === btn.dataset.id);
+        if (!it) return;
+        const act = btn.dataset.act;
+        if (act === "plus") adjustQty(it, 1);
+        if (act === "minus") adjustQty(it, -1);
+        if (act === "edit") openDialog(it);
+        if (act === "del" && confirm(`Delete "${it.name}"?`)) {
+          state.items = state.items.filter((x) => x._id !== it._id);
+          saveAll();
+          deleteFromCloud("items", it._id);
+          render();
+          toast(`Deleted "${it.name}"`);
+        }
+      });
+
+      function adjustQty(item, delta) {
+        if (delta < 0 && item.qty > 0) recordMovement(item, -delta, "sale");
+        item.qty = Math.max(0, item.qty + delta);
+        saveAll();
+        render();
+        maybeAlert(item);
+      }
+
+      function todayKey(offsetDays = 0) {
+        const d = new Date();
+        d.setDate(d.getDate() - offsetDays);
+        return d.toLocaleDateString("en-CA"); // YYYY-MM-DD in local time
+      }
+
+      function recordMovement(item, qty, kind) {
+        state.sales.push({ id: uid(), itemId: item._id, name: item.name, qty, price: item.price ?? 0, kind, date: todayKey(), ts: Date.now() });
+      }
+
+      // Fires one toast each time an item transitions into low/out this session.
+      function maybeAlert(item) {
+        const st = statusOf(item);
+        const key = `alerted:${item._id}`;
+        if (st === "out") {
+          if (sessionStorage.getItem(key) !== "out") {
+            toast(`🚨 ${item.name} is OUT of stock!`);
+            sessionStorage.setItem(key, "out");
+          }
+        } else if (st === "low") {
+          if (sessionStorage.getItem(key) !== "low" && sessionStorage.getItem(key) !== "out") {
+            toast(`⚠️ ${item.name} is running low (${item.qty} left)`);
+            sessionStorage.setItem(key, "low");
+          }
+        } else {
+          sessionStorage.removeItem(key);
+        }
+      }
+
+      // ================= Filters =================
+      $("searchInput").addEventListener("input", (e) => { state.search = e.target.value; render(); });
+      $("filterSelect").addEventListener("change", (e) => { state.filter = e.target.value; render(); });
+      $("sortSelect").addEventListener("change", (e) => { state.sort = e.target.value; render(); });
+      $("alertBadge").addEventListener("click", () => {
+        state.filter = state.filter === "low" ? "all" : "low";
+        $("filterSelect").value = state.filter;
+        render();
+      });
+
+      // ================= Auth & stores =================
+      const authBackdrop = $("authBackdrop");
+      const authErr = $("authErr");
+      let authMode = "signin"; // "signin" | "signup"
+
+      function showAuth(prefillCfg) {
+        authBackdrop.style.display = "flex";
+        if (prefillCfg) { $("cfgUrl").value = CFG.url || ""; $("cfgKey").value = CFG.key || ""; }
+        setAuthMode(authMode);
+      }
+      function hideAuth() { authBackdrop.style.display = "none"; }
+      function authFail(msg) { authErr.textContent = msg; authErr.style.display = "block"; }
+      function setAuthMode(mode) {
+        authMode = mode;
+        $("authTitle").textContent = mode === "signup" ? "☁️ Create your StockPilot account" : "☁️ Sign in to StockPilot";
+        $("authSubmit").textContent = mode === "signup" ? "Sign up" : "Sign in";
+        $("authToggle").textContent = mode === "signup" ? "Already have an account? Sign in" : "Need an account? Sign up";
+        $("storeNameField").classList.toggle("hidden", mode !== "signup");
+        authErr.style.display = "none";
+      }
+
+      function applySessionUI() {
+        const signedIn = !!(sb && cloudUser);
+        for (const id of ["storeSelect", "addStoreBtn", "logoutBtn"]) $(id).classList.toggle("hidden", !signedIn);
+        $("signinBtn").classList.toggle("hidden", signedIn);
+        if (!signedIn) renderStoresUI();
+      }
+
+      // Re-render everything that depends on which store is active.
+      function applyActiveStore() {
+        renderStoresUI();
+        currencySelect.value = state.currency;
+        render();
+        renderChat();
+      }
+
+      function renderStoresUI() {
+        const sel = $("storeSelect");
+        sel.innerHTML = "";
+        if (!cloudStores.length) { sel.classList.add("hidden"); return; }
+        sel.classList.remove("hidden");
+        for (const s of cloudStores) {
+          const o = document.createElement("option");
+          o.value = s.id;
+          o.textContent = s.name;
+          sel.appendChild(o);
+        }
+        sel.value = state.storeId;
+      }
+
+      async function switchStore(storeId) {
+        if (storeId === state.storeId) return;
+        try {
+          await pullStoreFromCloud(storeId);
+          localStorage.setItem(LS_LASTSTORE, storeId);
+          applyActiveStore();
+          toast(`Switched to ${cloudStores.find((s) => s.id === storeId)?.name || "store"}`);
+        } catch (e) {
+          toast(`⚠️ Couldn't load store: ${e.message}`, 3600);
+        }
+      }
+
+      async function afterSignIn(user, createdStore) {
+        cloudUser = user;
+        const { data: stores, error } = await sb.from("stores").select("*").order("created_at");
+        if (error) throw error;
+        cloudStores = stores || [];
+        if (createdStore && !cloudStores.length) {
+          const row = { id: uid(), user_id: user.id, name: createdStore, currency: state.currency };
+          const { error: e2 } = await sb.from("stores").insert(row);
+          if (e2) throw e2;
+          cloudStores = [row];
+        }
+        if (!cloudStores.length) throw new Error("No stores found for this account");
+        const last = localStorage.getItem(LS_LASTSTORE);
+        const target = cloudStores.find((s) => s.id === last) || cloudStores[0];
+        await pullStoreFromCloud(target.id);
+        // One-time: a brand-new cloud store starts empty — seed it with this browser's pre-cloud data.
+        if (!state.items.length) {
+          const legacyItems = loadLS("stockpilot.items.v1", []);
+          if (legacyItems.length) {
+            state.items = legacyItems;
+            state.sales = loadLS("stockpilot.sales.v1", []);
+            state.currency = loadLS("stockpilot.currency", state.currency);
+            target.currency = state.currency;
+            await sb.from("stores").update({ currency: state.currency }).eq("id", target.id);
+            await syncStoreToCloud();
+          }
+        }
+        localStorage.setItem(LS_LASTSTORE, target.id);
+        hideAuth();
+        applySessionUI();
+        applyActiveStore();
+        toast(`☁️ Signed in — ${cloudStores.length} store${cloudStores.length === 1 ? "" : "s"} loaded`, 3200);
+      }
+
+      async function signOut() {
+        if (sb) await sb.auth.signOut();
+        cloudUser = null;
+        cloudStores = [];
+        applySessionUI();
+        showAuth(true);
+        toast("Signed out");
+      }
+
+      $("authToggle").addEventListener("click", () => setAuthMode(authMode === "signin" ? "signup" : "signin"));
+      $("cfgSave").addEventListener("click", () => {
+        const url = $("cfgUrl").value.trim(), key = $("cfgKey").value.trim();
+        if (!/^https:\/\/.+\.supabase\.co\/?$/.test(url)) return authFail("URL should look like https://xxxxx.supabase.co");
+        if (key.length < 30) return authFail("Paste the anon/public key from Settings → API.");
+        localStorage.setItem(CFG_KEY, JSON.stringify({ url, key }));
+        toast("Cloud settings saved — reloading…");
+        setTimeout(() => location.reload(), 600);
+      });
+      $("offlineBtn").addEventListener("click", () => {
+        hideAuth();
+        applySessionUI();
+        bootOffline();
+        toast("Offline mode — data stays on this browser", 3000);
+      });
+      $("signinBtn").addEventListener("click", () => showAuth(true));
+      $("logoutBtn").addEventListener("click", signOut);
+      $("addStoreBtn").addEventListener("click", async () => {
+        const name = prompt("Name for the new store:", "");
+        if (!name || !name.trim()) return;
+        try {
+          const row = { id: uid(), user_id: cloudUser.id, name: name.trim(), currency: state.currency };
+          const { error } = await sb.from("stores").insert(row);
+          if (error) throw error;
+          cloudStores.push(row);
+          localStorage.setItem(LS_LASTSTORE, row.id);
+          await pullStoreFromCloud(row.id);
+          applyActiveStore();
+          toast(`✅ Store "${row.name}" created — empty, ready for its own stock`);
+        } catch (e) {
+          toast(`⚠️ Couldn't create store: ${e.message}`, 3600);
+        }
+      });
+      $("storeSelect").addEventListener("change", (e) => switchStore(e.target.value));
+      $("authSubmit").addEventListener("click", async () => {
+        const email = $("authEmail").value.trim(), pass = $("authPass").value;
+        if (!sb) return authFail("Configure the Supabase URL + key first.");
+        if (!email || !pass) return authFail("Enter your email and password.");
+        const btn = $("authSubmit");
+        btn.disabled = true;
+        try {
+          if (authMode === "signup") {
+            const storeName = $("storeName").value.trim() || "My Store";
+            const { data, error } = await sb.auth.signUp({ email, password: pass });
+            if (error) throw error;
+            const user = data.user;
+            await afterSignIn(user, storeName);
+          } else {
+            const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+            if (error) throw error;
+            await afterSignIn(data.user, null);
+          }
+        } catch (e) {
+          authFail(e.message || "Sign-in failed");
+        } finally {
+          btn.disabled = false;
+        }
+      });
+
+      // ================= Currency =================
+      const CURRENCIES = ["USD", "EUR", "GBP", "INR", "AED", "SAR", "PKR", "BDT", "NGN", "CAD", "AUD", "JPY", "KES", "ZAR", "PHP"];
+      const currencySelect = $("currencySelect");
+      for (const c of CURRENCIES) {
+        const o = document.createElement("option");
+        o.value = c;
+        o.textContent = c;
+        currencySelect.appendChild(o);
+      }
+      currencySelect.value = CURRENCIES.includes(state.currency) ? state.currency : "USD";
+      currencySelect.addEventListener("change", (e) => {
+        state.currency = e.target.value;
+        const st = cloudStores.find((s) => s.id === state.storeId);
+        if (st) {
+          // Cloud store: currency is owned by the stores row.
+          st.currency = state.currency;
+          sb.from("stores").update({ currency: state.currency }).eq("id", st.id)
+            .then(({ error }) => { if (error) console.warn("currency sync failed", error.message); });
+        } else {
+          // Offline store: JSON-encoded so loadLS() can read it back.
+          localStorage.setItem("stockpilot.currency", JSON.stringify(state.currency));
+        }
+        saveAll();
+        render();
+        toast(`Currency set to ${state.currency}`);
+      });
+
+      // ================= Chat UI =================
+      const chatPanel = $("chatPanel");
+      const chatMsgs = $("chatMsgs");
+      const chatInput = $("chatInput");
+      const SUGGESTIONS = [
+        "add 10 pens",
+        "sold 3 pens",
+        "set pens to 25",
+        "what's low?",
+        "show inventory",
+        "daily report",
+        "weekly report",
+        "help",
+      ];
+
+      function openChat() {
+        chatPanel.style.display = "flex";
+        $("chatFab").style.display = "none";
+        renderChat();
+        setTimeout(() => chatInput.focus(), 50);
+      }
+      function closeChat() {
+        chatPanel.style.display = "none";
+        $("chatFab").style.display = "";
+      }
+      $("chatFab").addEventListener("click", openChat);
+      $("chatClose").addEventListener("click", closeChat);
+
+      function renderChat() {
+        chatMsgs.innerHTML = "";
+        for (const m of state.chat) {
+          const div = document.createElement("div");
+          div.className = "msg " + (m.role === "user" ? "user" : "bot");
+          div.textContent = m.text;
+          chatMsgs.appendChild(div);
+        }
+        chatMsgs.scrollTop = chatMsgs.scrollHeight;
+      }
+
+      function pushChat(role, text) {
+        state.chat.push({ role, text });
+        if (state.chat.length > 300) state.chat = state.chat.slice(-200);
+        renderChat();
+      }
+
+      function sendChat() {
+        const text = chatInput.value.trim();
+        if (!text) return;
+        pushChat("user", text);
+        chatInput.value = "";
+        setTimeout(() => {
+          const reply = handleCommand(text);
+          pushChat("bot", reply);
+          saveAll();
+          render();
+        }, 220);
+      }
+      $("chatSend").addEventListener("click", sendChat);
+      chatInput.addEventListener("keydown", (e) => { if (e.key === "Enter") sendChat(); });
+
+      for (const c of SUGGESTIONS) {
+        const b = document.createElement("button");
+        b.className = "chip";
+        b.textContent = c;
+        b.addEventListener("click", () => { chatInput.value = c; sendChat(); });
+        $("chatChips").appendChild(b);
+      }
+
+      // ================= Chat command parser =================
+      function normalizeName(s) {
+        return String(s).trim().toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+      }
+
+      function resolveItem(name) {
+        const n = normalizeName(name);
+        if (!n) return { exists: false, item: null };
+        let it = state.items.find((x) => normalizeName(x.name) === n);
+        if (!it) it = state.items.find((x) => normalizeName(x.name).includes(n));
+        // Fuzzy fallback: every query token (len>=3) appears in the item name, so "viv y18 combo" finds "vivo y18 combo".
+        if (!it) {
+          const tokens = n.split(" ").filter((w) => w.length >= 3);
+          if (tokens.length) {
+            it = state.items.find((x) => {
+              const nx = normalizeName(x.name);
+              return tokens.every((w) => nx.includes(w));
+            });
+          }
+        }
+        return { exists: !!it, item: it ?? null };
+      }
+
+      function titleCase(s) {
+        return String(s).trim().replace(/\b\w/g, (c) => c.toUpperCase());
+      }
+
+      function createItem(name, qty, price = 0, threshold = DEFAULT_THRESHOLD, category, description) {
+        const dup = state.items.find((x) => normalizeName(x.name) === normalizeName(name));
+        if (dup) {
+          dup.qty += qty;
+          if (description) dup.description = description;
+          saveAll();
+          const st = statusOf(dup);
+          const note = st === "out" ? " 🚨 Still out of stock!" : st === "low" ? " ⚠️ Low stock!" : "";
+          return `✅ "${dup.name}" already existed — added ${qty}. Now ${dup.qty} in stock.${note}`;
+        }
+        const item = { _id: uid(), name: titleCase(name), qty, price, threshold, category, description, createdAt: Date.now() };
+        state.items.push(item);
+        saveAll();
+        const st = statusOf(item);
+        const note = st === "low" ? " ⚠️ Low stock!" : st === "out" ? " 🚨 Out of stock!" : "";
+        return `✅ Created "${item.name}" with ${qty} units.${note}`;
+      }
+
+      function lowStockReply() {
+        const outs = state.items.filter((it) => statusOf(it) === "out");
+        const lows = state.items.filter((it) => statusOf(it) === "low");
+        if (!lows.length && !outs.length) return "✅ Nothing is low right now — all items are healthy!";
+        const lines = [];
+        if (outs.length) {
+          lines.push("🚨 OUT OF STOCK:");
+          for (const it of outs) lines.push(`   • ${it.name} — 0 left`);
+        }
+        if (lows.length) {
+          lines.push("⚠️ LOW STOCK:");
+          for (const it of lows) lines.push(`   • ${it.name} — ${it.qty} left (alert at ${it.threshold})`);
+        }
+        lines.push("", 'Tip: "restock 20 pens" to refill.');
+        return lines.join("\n");
+      }
+
+      function inventoryReply() {
+        if (!state.items.length) return "Inventory is empty. Try \"add 10 pens\" to create your first item.";
+        const lines = ["📦 Inventory:"];
+        for (const it of [...state.items].sort((a, b) => b.qty - a.qty)) {
+          const st = statusOf(it);
+          const flag = st === "out" ? " 🚨" : st === "low" ? " ⚠️" : "";
+          lines.push(`   • ${it.name}: ${it.qty}${flag}`);
+        }
+        return lines.join("\n");
+      }
+
+      // Sales in a period: day → today/yesterday, week → last 7 days, month → last 30.
+      function salesIn(span) {
+        if (span === "day" || span === "yesterday") {
+          const key = todayKey(span === "yesterday" ? 1 : 0);
+          return state.sales.filter((s) => s.date === key);
+        }
+        const days = span === "month" ? 30 : 7;
+        const cutoff = Date.now() - days * 864e5;
+        return state.sales.filter((s) => s.ts >= cutoff);
+      }
+
+      function detectSpan(t) {
+        if (/yesterday/.test(t)) return "yesterday";
+        if (/month|30 ?day/.test(t)) return "month";
+        if (/week|7 ?day/.test(t)) return "week";
+        return "day";
+      }
+      function topItems(rows) {
+        const byItem = new Map();
+        for (const s of rows) {
+          const cur = byItem.get(s.name) || { qty: 0, revenue: 0 };
+          cur.qty += s.qty;
+          cur.revenue += s.qty * s.price;
+          byItem.set(s.name, cur);
+        }
+        return [...byItem.entries()].sort((a, b) => b[1].qty - a[1].qty);
+      }
+
+      function salesListReply(span) {
+        const top = topItems(salesIn(span).filter((s) => s.kind === "sale"));
+        if (!top.length) return `No sales ${span === "day" ? "today" : span === "yesterday" ? "yesterday" : "this " + span}.`;
+        const lines = [`📊 Sales ${span === "day" ? "today" : span === "yesterday" ? "yesterday" : "this " + span}:`];
+        for (const [name, v] of top) lines.push(`   • ${name} — ${v.qty} sold (${money(v.revenue)})`);
+        const units = top.reduce((n, [, v]) => n + v.qty, 0);
+        const revenue = top.reduce((n, [, v]) => n + v.revenue, 0);
+        lines.push(`   Total: ${units} units · ${money(revenue)}`);
+        return lines.join("\n");
+      }
+
+      function reportReply(span) {
+        const label = span === "day" ? "Today" : span === "yesterday" ? "Yesterday" : span === "week" ? "Last 7 days" : "Last 30 days";
+        const rows = salesIn(span);
+        const sales = rows.filter((s) => s.kind === "sale");
+        const uses = rows.filter((s) => s.kind === "use");
+        const top = topItems(sales);
+        const units = sales.reduce((n, s) => n + s.qty, 0);
+        const revenue = sales.reduce((n, s) => n + s.qty * s.price, 0);
+
+        const lines = [`📊 ${label} — sales report:`, `   Sold: ${units} unit${units === 1 ? "" : "s"} · ${money(revenue)}`];
+        if (uses.length) {
+          const useQty = uses.reduce((n, s) => n + s.qty, 0);
+          lines.push(`   Store use: ${useQty} unit${useQty === 1 ? "" : "s"} (not sales)`);
+        }
+        if (top.length) {
+          lines.push("   Top items:");
+          for (const [name, v] of top.slice(0, 5)) lines.push(`   • ${name} — ${v.qty} sold (${money(v.revenue)})`);
+        } else {
+          lines.push("   No sales in this period.");
+        }
+        return lines.join("\n");
+      }
+
+      function handleCommand(raw) {
+          const text = String(raw ?? "").trim();
+        const t = text.toLowerCase();
+        let m;
+
+        // empty input
+        if (!text) return "Type a command, e.g. \"add 10 pens\" — or \"help\" for the list.";
+
+        // help
+        if (/^(help|what can you do\??|commands\??)$/.test(t)) {
+          return [
+            "Here's what I can do:",
+            '• "add 10 pens" — add a new item or stock',
+            '• "sold 3 pens" — record a sale (stock −3)',
+            '• "used 2 pens for store" — took from stock for the shop itself (no sale)',
+            '• "daily report" / "weekly report" / "monthly report"',
+            '• "what sold today?" / "top items this week"',
+            '• "set pens to 25" — set exact quantity',
+            '• "set price xiaomi 5a combo 1500 each" — change an item\'s price',
+            '• "what\'s low?" / "show inventory"',
+            '• "desc pens" — show description; "set desc pens: display unit" — set it',
+            '• "add item hammer, qty 20, price 9.5, desc for counter use"',
+            '• "how many pens do we have?" · "delete pens"',
+          ].join("\n");
+        }
+
+        // reports: "daily report" / "weekly report" / "monthly report" / "report today"
+        if (t.includes("report")) {
+          return reportReply(detectSpan(t));
+        }
+
+        // "what sold today/yesterday" / "top items this week" / "sales"
+        const salesQuery =
+          ((t.startsWith("what") || t.startsWith("which")) && t.includes("sold")) ||
+          t.startsWith("sales") || t.startsWith("sold items") ||
+          t.startsWith("top ") || t.startsWith("most used") ||
+          ((t.startsWith("show ") || t.startsWith("list ")) && (t.includes("sales") || t.includes("sold"))) ||
+          ((t.startsWith("how many") || t.startsWith("how much")) && /\b(sold|sell|sales)\b/.test(t) && /\b(today|yesterday|week|month)\b/.test(t)); // "how many combos did we sell today?"
+        if (salesQuery) {
+          return salesListReply(detectSpan(t));
+        }
+
+        // "what's low" (but not "sold") → alert list
+        if (/(what'?s|what is|whats).*(low|short|running out)|^(list )?low stock$|^alerts?$|^show alerts$/.test(t)) {
+          return lowStockReply();
+        }
+
+        // show inventory
+        if (/^(show|list|view) (inventory|stock|items)$|^inventory( report)?$|^show( me)?( the)? stock$/.test(t)) {
+          return inventoryReply();
+        }
+
+        // detailed create/update: "add item hammer, qty 20, price 9.5, category tools"
+        m = text.match(/^add item (.+)$/i);
+        if (m) {
+          const parts = m[1].split(",").map((s) => s.trim()).filter(Boolean);
+          const name = parts[0];
+          if (!name) return '🤔 What\'s the item name? e.g. "add item hammer, qty 20"';
+          let qty = 0, price = 0, threshold = DEFAULT_THRESHOLD, category, description;
+          for (const p of parts.slice(1)) {
+            let mm;
+            if ((mm = p.match(/^q(?:ty|uantity)?\s*(\d+(?:\.\d+)?)$/i))) qty = Math.round(Number(mm[1]));
+            else if ((mm = p.match(/^price\s*(\d+(?:\.\d+)?)$/i))) price = Number(mm[1]);
+            else if ((mm = p.match(/^(?:low|threshold|alert)\s*(?:at|:)?\s*(\d+)$/i))) threshold = Math.round(Number(mm[1]));
+            else if ((mm = p.match(/^(?:cat|category)\s+(.+)$/i))) category = titleCase(mm[1]);
+            else if ((mm = p.match(/^(?:desc|description|note)\s*[:=]?\s*(.+)$/i))) description = mm[1].trim();
+            else if ((mm = p.match(/^(\d+(?:\.\d+)?)$/))) qty = Math.round(Number(mm[1]));
+          }
+          const target = resolveItem(name);
+          if (target.exists) {
+            if (qty) target.item.qty = qty;
+            target.item.price = price || target.item.price;
+            target.item.threshold = threshold;
+            if (category) target.item.category = category;
+            if (description) target.item.description = description;
+            saveAll();
+            return `✅ Updated "${target.item.name}" — now ${target.item.qty} in stock.`;
+          }
+          return createItem(name, qty, price, threshold, category, description);
+        }
+
+        // add: "add 10 pens" / "add 5 to pens" / "restock 5 pens" / "refill 20 pens"
+        m = t.match(/^(?:add|restock|stock|refill|order)\s+(\d+)\s+(?:more\s+)?(?:to\s+|of\s+)?(.+?)(?:\s+to (?:the )?(?:inventory|stock))?$/);
+        if (m) {
+          const qty = parseInt(m[1], 10);
+          const target = resolveItem(m[2]);
+          if (target.exists) {
+            target.item.qty += qty;
+            saveAll();
+            maybeAlert(target.item);
+            return `✅ Added ${qty} ${qty === 1 ? "unit" : "units"} to "${target.item.name}" — now ${target.item.qty} in stock.`;
+          }
+          return createItem(m[2], qty);
+        }
+
+        // "pens +5"
+        m = t.match(/^(.+?)\s*\+\s*(\d+)$/);
+        if (m) {
+          const target = resolveItem(m[1]);
+          if (target.exists) {
+            target.item.qty += parseInt(m[2], 10);
+            saveAll();
+            maybeAlert(target.item);
+            return `✅ "${target.item.name}" is now ${target.item.qty}.`;
+          }
+        }
+
+        // store-use: "used 2 pens for store" / "use 1 pen for display" — stock out, NOT a sale
+        m = t.match(/^(?:used|use|took|consume[d]?|damaged?)\s+(\d+)\s+(?:units?\s+)?(?:of\s+)?(.+?)\s+(?:for|in|on)\s+(?:the )?(?:store|shop|display|demos?|office|internal|own use|testing)$/);
+        if (m) {
+          const qty = parseInt(m[1], 10);
+          const target = resolveItem(m[2]);
+          if (!target.exists) return `🤔 I couldn't find "${m[2]}". Try "show inventory".`;
+          if (target.item.qty < qty) return `⚠️ Only ${target.item.qty} of "${target.item.name}" in stock — can't take ${qty}.`;
+          target.item.qty -= qty;
+          recordMovement(target.item, qty, "use");
+          saveAll();
+          render();
+          maybeAlert(target.item);
+          return `🏪 Taken for store use: ${qty} × "${target.item.name}" — ${target.item.qty} left. (Logged as store use, not a sale.)`;
+        }
+
+        // store-use, item-first: "redmi 9a used in store" (no qty) → ask how many
+        m = t.match(/^(.+?)\s+used\s+(?:in|for)\s+(?:the\s+)?(?:store|shop|display)$/);
+        if (m) {
+          const target = resolveItem(m[1]);
+          if (target.exists) return `How many were used? e.g. "used 2 ${target.item.name.toLowerCase()} for store" — currently ${target.item.qty} in stock.`;
+        }
+
+        // subtract (a sale): "sold 3 pens" / "sell 3 pens" / "remove 3 pens" / "subtract 3 from pens"
+        m = t.match(/^(?:sold|sell|sells|remove|subtract|deduct|reduce|use)\s+(\d+)\s+(?:units?\s+)?(?:of\s+)?(.+?)(?:\s+from (?:the )?(?:inventory|stock))?$/) ||
+            t.match(/^(?:sold|sell|sells|remove|subtract|deduct|reduce|use)\s+(\d+)\s+from\s+(.+)$/);
+        if (m) {
+          const qty = parseInt(m[1], 10);
+          const target = resolveItem(m[2]);
+          if (!target.exists) return `🤔 I couldn't find "${m[2]}". Try "show inventory" to see all items.`;
+          if (target.item.qty < qty) return `⚠️ Only ${target.item.qty} of "${target.item.name}" in stock — can't remove ${qty}.`;
+          target.item.qty -= qty;
+          recordMovement(target.item, qty, "sale");
+          const st = statusOf(target.item);
+          saveAll();
+          maybeAlert(target.item);
+          const suffix = st === "out" ? " 🚨 Now OUT of stock!" : st === "low" ? " ⚠️ Low stock!" : "";
+          return `✅ Removed ${qty} from "${target.item.name}" — ${target.item.qty} left.${suffix}`;
+        }
+
+        // set price: "set/put price xiaomi 5a combo 1500 each" / "set price pens to 20" (before qty-set so "price X" isn't read as an item name)
+        m = text.match(/^(?:set |put )?price (?:of |for )?(.+?) (?:to |=|:)?\s*(\d+(?:\.\d+)?)\s*(?:each|per unit|rs\.?|inr)?$/i);
+        if (m) {
+          const target = resolveItem(m[1]);
+          if (!target.exists) return `🤔 No item called "${m[1]}". Try "show inventory".`;
+          target.item.price = Number(m[2]);
+          saveAll();
+          render();
+          return `✅ Price of "${target.item.name}" set to ${money(target.item.price)}.`;
+        }
+
+        // set exact qty: "set pens to 25" / "pens = 25" / "update pens to 25"
+        m = t.match(/^(?:set|update|change)\s+(.+?)\s+(?:to|=|:)\s*(\d+)$/) || t.match(/^(.+?)\s*(?:=|:)\s*(\d+)$/);
+        if (m) {
+          const name = m[1];
+          const qty = parseInt(m[2], 10);
+          const target = resolveItem(name);
+          if (!target.exists) return `🤔 I couldn't find "${name}". Add it first with "add 10 ${name}".`;
+          target.item.qty = qty;
+          saveAll();
+          maybeAlert(target.item);
+          render();
+          return `✅ "${target.item.name}" set to ${qty}.`;
+        }
+
+        // query: "how many pens" / "stock of pens"
+        m = t.match(/^(?:how many|how much|check|stock of|quantity of|qty of)\s+(.+?)(?:\s+do (?:we|i) (?:have|got)\??)?$/) ||
+            t.match(/^(?:how many|how much)\s+(.+?)\s+do (?:we|i) have\??$/);
+        if (m) {
+          const target = resolveItem(m[1]);
+          if (target.exists) {
+            const st = statusOf(target.item);
+            const note = st === "out" ? " — OUT of stock 🚨" : st === "low" ? " — low stock ⚠️" : "";
+            return `📦 "${target.item.name}": ${target.item.qty} units${note}`;
+          }
+          return `🤔 No item called "${m[1]}". Try "show inventory" or "add 10 ${m[1]}".`;
+        }
+
+        // delete: "delete pens" / "remove item pens"
+        m = t.match(/^(?:delete|remove item|del)\s+(.+)$/);
+        if (m) {
+          const target = resolveItem(m[1]);
+          if (!target.exists) return `🤔 No item called "${m[1]}".`;
+          state.items = state.items.filter((x) => x._id !== target.item._id);
+          saveAll();
+          deleteFromCloud("items", target.item._id);
+          return `🗑️ Deleted "${target.item.name}".`;
+        }
+
+        // "desc pens" — show description
+        m = t.match(/^(?:desc|description|details?|info)(?: of| for)?\s+(.+)$/);
+        if (m) {
+          const target = resolveItem(m[1]);
+          if (!target.exists) return `🤔 No item called "${m[1]}".`;
+          const it = target.item;
+          const bits = [`📦 "${it.name}": ${it.qty} in stock @ ${money(it.price ?? 0)}`];
+          if (it.category) bits.push(`Category: ${it.category}`);
+          bits.push(`Description: ${it.description || "—"}`);
+          return bits.join("\n");
+        }
+
+        // "set desc pens: counter display" — set description
+        m = text.match(/^(?:set )?(?:desc|description)(?: (?:of|for))?\s+(.+?)\s*[:=]\s*(.+)$/i);
+        if (m) {
+          const target = resolveItem(m[1]);
+          if (!target.exists) return `🤔 No item called "${m[1]}".`;
+          target.item.description = m[2].trim();
+          saveAll();
+          render();
+          return `✅ Description of "${target.item.name}" set.`;
+        }
+
+        // "sell" with no number: "sell pens" → ask for the amount
+        m = t.match(/^(?:sold|sell|sells|remove|subtract|deduct|reduce|use)\s+(.+)$/);
+        if (m) {
+          const target = resolveItem(m[1]);
+          if (target.exists) {
+            const it = target.item;
+            return `How many? e.g. "sold 3 ${it.name}" — currently ${it.qty} in stock.`;
+          }
+        }
+
+        // fallback: bare item name → report stock
+        if (state.items.length) {
+          const target = resolveItem(t);
+          if (target.exists) {
+            const st = statusOf(target.item);
+            const note = st === "out" ? " — OUT of stock 🚨" : st === "low" ? " — low stock ⚠️" : "";
+            return `📦 "${target.item.name}": ${target.item.qty} units${note}`;
+          }
+        }
+
+        return [
+          "🤔 I didn't quite get that. Examples:",
+          '• "add 10 pens"',
+          '• "sold 3 pens"',
+          '• "set pens to 25"',
+          '• "what\'s low?"',
+          '• "how many hammers do we have?"',
+          'Type "help" for the full list.',
+        ].join("\n");
+      }
+
+      // ================= Keyboard shortcuts =================
+      document.addEventListener("keydown", (e) => {
+        const tag = e.target.tagName;
+        if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA" || e.target.isContentEditable) return;
+        if (e.key === "n" || e.key === "N") openDialog(null);
+        if (e.key === "/") { e.preventDefault(); openChat(); }
+      });
+
+      // ================= Init =================
+      applyTheme();
+
+      // Offline mode: no cloud configured, or the user chose "Continue without cloud".
+      function bootOffline() {
+        state.storeId = "local-default";
+        // One-time migration from the pre-cloud single-store keys so existing data survives.
+        const NI = LS_STORE + "local-default.items", NS = LS_STORE + "local-default.sales", NC = LS_STORE + "local-default.chat";
+        if (localStorage.getItem("stockpilot.items.v1") && !localStorage.getItem(NI)) {
+          localStorage.setItem(NI, localStorage.getItem("stockpilot.items.v1"));
+          localStorage.setItem(NS, localStorage.getItem("stockpilot.sales.v1") || "[]");
+          localStorage.setItem(NC, localStorage.getItem("stockpilot.chat.v1") || "[]");
+        }
+        state.items = loadLS(NI, []);
+        state.sales = loadLS(NS, []);
+        state.currency = loadLS("stockpilot.currency", "USD");
+        state.chat = loadLS(NC, GREETING);
+        currencySelect.value = CURRENCIES.includes(state.currency) ? state.currency : "USD";
+        render();
+        renderChat();
+        startupAlert();
+      }
+
+      (async function boot() {
+        if (!sb) {
+          bootOffline();
+          return;
+        }
+        const { data, error } = await sb.auth.getSession();
+        if (error || !data || !data.session) {
+          showAuth(true);
+          return;
+        }
+        try {
+          await afterSignIn(data.session.user, null);
+          startupAlert();
+        } catch (e) {
+          authFail("Signed in but couldn't load your data: " + (e.message || e));
+        }
+      })();
+
+      function startupAlert() {
+        const outs = state.items.filter((it) => statusOf(it) === "out");
+        const lows = state.items.filter((it) => statusOf(it) === "low");
+        if (outs.length || lows.length) {
+          const parts = [];
+          if (outs.length) parts.push(`${outs.length} out of stock`);
+          if (lows.length) parts.push(`${lows.length} low`);
+          setTimeout(() => toast(`🔔 Stock alert: ${parts.join(", ")} — click the bell for details`, 4200), 600);
+        }
+      }
+
+      // (startup alert moved into boot() — runs after data load in either mode)
+    </script>
+  </body>
+</html>
