@@ -12,9 +12,9 @@ Open `index.html` in any browser — that's it. No build, no install, no server 
 
 - **Inventory table** — add / edit / delete items with description, ±1 quick adjust, search, filter, sort
 - **Stats dashboard** — total items, units in stock, stock value, low/out count, units sold today
-- **Currency selector** — USD, EUR, INR, PKR, and more; persisted, applies everywhere instantly
+- **Currency selector** — INR, USD, EUR, PKR, and more; persisted, applies everywhere instantly
 - **Sales log** — every sale (chat "sold", −1 button) and store-use (chat "used … for store") is recorded with date & price
-- **Reports** — daily / weekly (7d) / monthly (30d): units sold, revenue, store-use units, top items
+- **Reports** — daily / weekly (7d) / monthly (30d) plus custom date ranges: units sold, revenue, store-use units, top items
 - **Low-stock alerts** — per-item alert threshold; toasts fire when stock transitions to low/out; bell badge in the header
 - **Chat assistant** (💬 button, or press `/`) — natural language commands:
 
@@ -38,7 +38,8 @@ Open `index.html` in any browser — that's it. No build, no install, no server 
 | `help` | Full command list |
 
 - **Persistence** — data saved in browser localStorage (per browser/profile), and to the cloud when signed in
-- **Multi-store + cloud (optional)** — see **Cloud setup** below
+- **Multi-store** — 🏬 **Stores** opens an all-stores overview: one card per store with items, units, stock value, low/out alerts, units sold today, and today's revenue. Create and delete stores; each store has **its own page, stock, sales log, reports, currency, and its own assistant conversation** — so each store's chat keeps its own context.
+- **Cloud sync (optional)** — see **Cloud setup** below; offline stores carry over automatically on first sign-in
 - **Dark / light mode** — follows system preference, toggle in header
 - **Keyboard shortcuts** — `N` = add item, `/` = open assistant
 
@@ -61,4 +62,4 @@ Notes:
 ## Notes
 
 - Without cloud configured, the app is fully usable offline on one store (previous behavior).
-- Prices are in USD by default; each store's currency selector (or the chat/set default) changes it per store.
+- Prices are in INR by default; each store's currency selector (or the chat/set default) changes it per store.

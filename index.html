@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>StockPilot — Inventory MVP</title>
+    <title>StockPilot — Multi-store Inventory</title>
     <style>
       :root {
         --bg: #f6f7fb;
@@ -364,14 +364,74 @@
       .auth-card .err { color: #e5484d; font-size: 12.5px; margin: 6px 0 0; white-space: pre-wrap; }
       .auth-card .note { color: var(--muted); font-size: 12px; margin-top: 12px; line-height: 1.45; }
       .auth-note { font-size: 11.5px; color: var(--muted); margin-left: 6px; }
+
+      /* ================= Multi-store overview ================= */
+      .overview-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 4px 0 14px; flex-wrap: wrap; }
+      .overview-head h2 { margin: 0; font-size: 20px; letter-spacing: -0.02em; }
+      .stores-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; margin-bottom: 16px; }
+      .store-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; cursor: pointer; transition: transform 0.05s, border-color 0.15s; text-align: left; }
+      .store-card:hover { border-color: var(--brand); }
+      .store-card:active { transform: scale(0.98); }
+      .store-card .sc-top { display: flex; align-items: center; gap: 10px; }
+      .store-card .sc-emoji { width: 34px; height: 34px; border-radius: 10px; background: linear-gradient(135deg, #6366f1, #8b5cf6); display: grid; place-items: center; color: white; font-size: 16px; flex-shrink: 0; }
+      .store-card .sc-name { font-weight: 800; font-size: 15px; letter-spacing: -0.01em; }
+      .store-card .sc-cur { font-size: 11px; color: var(--muted); font-weight: 700; }
+      .store-card .sc-del { margin-left: auto; }
+      .store-card .sc-stats { display: flex; gap: 14px; }
+      .store-card .sc-stat { display: flex; flex-direction: column; gap: 1px; }
+      .store-card .sc-stat b { font-size: 17px; font-variant-numeric: tabular-nums; }
+      .store-card .sc-stat span { font-size: 10px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+      .store-card .sc-stat b.warn { color: var(--warn); }
+      .store-card .sc-stat b.danger { color: var(--danger); }
+
+      /* ================= Reports panel ================= */
+      .reports {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 14px 16px;
+        margin-bottom: 16px;
+      }
+      .reports-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+      .reports-head h3 { margin: 0; font-size: 15px; letter-spacing: -0.01em; }
+      .rp-seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+      .rp-seg button {
+        border: none; background: transparent; color: var(--muted);
+        padding: 7px 14px; font-size: 12.5px; font-weight: 700; cursor: pointer; white-space: nowrap;
+      }
+      .rp-seg button + button { border-left: 1px solid var(--line); }
+      .rp-seg button:hover { color: var(--ink); }
+      .rp-seg button.active { background: var(--brand); color: var(--brand-ink); }
+      .rp-custom { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+      .rp-custom label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+      .rp-custom input[type="date"] {
+        background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+        padding: 7px 10px; color: var(--ink); font: inherit; font-size: 13px; outline: none;
+        color-scheme: light;
+      }
+      [data-theme="dark"] .rp-custom input[type="date"] { color-scheme: dark; }
+      .rp-custom input[type="date"]:focus { border-color: var(--brand); }
+      .rp-report {
+        margin-top: 12px;
+        padding: 12px 14px;
+        border-radius: 12px;
+        background: color-mix(in srgb, var(--panel) 55%, var(--bg));
+        border: 1px solid var(--line);
+        font-size: 13px;
+        line-height: 1.55;
+        white-space: pre-wrap;
+        display: none;
+      }
+      .rp-report.show { display: block; }
     </style>
   </head>
   <body>
     <header>
-      <div class="logo"><div class="logo-box">📦</div> StockPilot</div>
+      <div class="logo"><div class="logo-box">📦</div> <span id="brandName">StockPilot</span></div>
       <div class="spacer"></div>
       <div class="header-actions">
         <button class="btn ghost" id="signinBtn" title="Sign in / cloud settings">☁️ Sign in</button>
+        <button class="btn ghost" id="storesBtn" title="All stores overview">🏬 Stores</button>
         <select id="storeSelect" aria-label="Store" title="Store" style="display:none"></select>
         <button class="btn ghost" id="addStoreBtn" title="Add another store" style="display:none">＋ Store</button>
         <button class="btn ghost" id="logoutBtn" title="Sign out" style="display:none">Log out</button>
@@ -383,6 +443,20 @@
     </header>
 
     <main>
+      <!-- All-stores overview: a page per store, with live stock/sales stats and quick open. -->
+      <div id="overview" style="display:none">
+        <div class="overview-head">
+          <h2>🏬 All Stores</h2>
+          <div class="header-actions">
+            <button class="btn" id="storeCreate">＋ New Store</button>
+            <button class="btn primary" id="overviewClose">Back to stock</button>
+          </div>
+        </div>
+        <div class="stores-grid" id="storesGrid"></div>
+        <p class="hint">Every store has its own stock, sales, reports, currency, and assistant. Click a store to open it.</p>
+      </div>
+
+      <div id="storeView">
       <div class="stats">
         <div class="stat"><span class="label">Total Items</span><span class="value" id="statTotal">0</span></div>
         <div class="stat"><span class="label">Units in Stock</span><span class="value" id="statUnits">0</span></div>
@@ -405,6 +479,28 @@
         </select>
       </div>
 
+      <!-- Reports: daily / weekly / monthly presets plus any custom date range. -->
+      <div class="reports">
+        <div class="reports-head">
+          <h3>📊 Sales reports</h3>
+          <div class="rp-seg" id="rpSeg">
+            <button data-span="day" class="active">Daily</button>
+            <button data-span="week">Weekly (7d)</button>
+            <button data-span="month">Monthly (30d)</button>
+            <button data-span="custom">Custom</button>
+          </div>
+        </div>
+        <div class="rp-custom" id="rpCustom" style="display:none">
+          <label for="rpFrom">From</label>
+          <input type="date" id="rpFrom" />
+          <label for="rpTo">To</label>
+          <input type="date" id="rpTo" />
+          <button class="btn" id="rpApply">Show report</button>
+          <span class="hint" style="margin:0">Inclusive — e.g. from 01 to 15 shows sales on both days.</span>
+        </div>
+        <div class="rp-report" id="rpOutput"></div>
+      </div>
+
       <div class="table-wrap">
         <table>
           <thead>
@@ -418,6 +514,7 @@
         </div>
       </div>
       <p class="hint">Data is saved in your browser (localStorage). Shortcuts: <kbd>N</kbd> add item · <kbd>/</kbd> open assistant.</p>
+      </div><!-- /storeView -->
     </main>
 
     <button class="fab-chat" id="chatFab" title="Open assistant ( / )">💬</button>
@@ -426,7 +523,7 @@
       <div class="chat-head">
         <div class="avatar">🤖</div>
         <div>
-          <div class="title">StockPilot Assistant</div>
+          <div class="title" id="chatHeadName">StockPilot Assistant</div>
           <div class="sub">“add 10 pens” · “sold 3 pens” · “what's low?”</div>
         </div>
         <div class="spacer"></div>
@@ -534,12 +631,40 @@
         return !!(sb && cloudUser && cloudStores.some((s) => s.id === state.storeId));
       }
 
+      // True when the user is signed in at all (cloud mode vs offline mode).
+      function signedIn() {
+        return !!(sb && cloudUser);
+      }
+
       // ================= Store-scoped state =================
       // Offline fallback prefix: "stockpilot.local.<storeId>". Cloud keys live in Supabase.
       const LS_STORE = "stockpilot.local.";
       const LS_LASTSTORE = "stockpilot.lastStore";
       const LS_THEME = "stockpilot.theme";
-      const DEFAULT_THRESHOLD = 5;
+      const DEFAULT_THRESHOLD = 5; // low-stock default
+
+      // ================= Multi-store =================
+      // uiView: "store" (one store's page) or "overview" (all-stores page).
+      // Offline store registry: stockpilot.stores = [{id, name}]. Each store's data lives
+      // under stockpilot.local.<id>.* via loadLS/saveLS — same shape as cloud stores, so
+      // the overview page renders stats from the registry plus per-store local cache.
+      const LS_STORES = "stockpilot.stores";
+      let uiView = "store";   // current page: "store" | "overview"
+
+      function storeNameOf(id) {
+        const fromCloud = (cloudStores || []).find((s) => s.id === id);
+        if (fromCloud) return fromCloud.name;
+        return (localStores().find((s) => s.id === id) || {}).name || "Store";
+      }
+
+      function localStores() {
+        const list = loadLS(LS_STORES, null);
+        if (list && list.length) return list;
+        // First boot (or legacy): register the default store instead of inventing it.
+        const def = [{ id: "local-default", name: "My Store" }];
+        saveLS(LS_STORES, def);
+        return def;
+      }
 
       function loadLS(key, fallback) {
         try {
@@ -561,7 +686,7 @@
         storeId: "local-default",
         items: [],
         sales: [],
-        currency: "USD",
+        currency: "INR",
         chat: GREETING,
         filter: "all",
         sort: "name",
@@ -627,7 +752,9 @@
           kind: r.kind, ts: Date.parse(r.ts), date: r.date,
         }));
         state.chat = (chats && chats[0] && chats[0].messages) || GREETING;
-        state.currency = cloudStores.find((s) => s.id === storeId)?.currency || "USD";
+        state.currency = cloudStores.find((s) => s.id === storeId)?.currency || "INR";
+        resetReports();
+        saveAll(); // cache locally so the all-stores overview shows this store's real numbers
       }
 
       // Best-effort cloud delete — without it the next pull resurrects the deleted item.
@@ -827,6 +954,7 @@
         item.qty = Math.max(0, item.qty + delta);
         saveAll();
         render();
+        refreshReports();
         maybeAlert(item);
       }
 
@@ -890,11 +1018,16 @@
         authErr.style.display = "none";
       }
 
+      // Header buttons depend on cloud sign-in state; the store dropdown works in
+      // both modes (offline stores are listed too). Inline display wins over the
+      // .hidden class, so use style.display for these.
       function applySessionUI() {
-        const signedIn = !!(sb && cloudUser);
-        for (const id of ["storeSelect", "addStoreBtn", "logoutBtn"]) $(id).classList.toggle("hidden", !signedIn);
-        $("signinBtn").classList.toggle("hidden", signedIn);
-        if (!signedIn) renderStoresUI();
+        const isCloud = signedIn();
+        // Store picker and "＋ Store" work offline too; logout is cloud-only.
+        for (const id of ["storeSelect", "addStoreBtn"]) $(id).style.display = "";
+        $("logoutBtn").style.display = isCloud ? "" : "none";
+        $("signinBtn").style.display = isCloud ? "none" : "";
+        renderStoresUI();
       }
 
       // Re-render everything that depends on which store is active.
@@ -903,21 +1036,192 @@
         currencySelect.value = state.currency;
         render();
         renderChat();
+        resetReports();
+        setBrand(storeNameOf(state.storeId));
+      }
+
+      // ---- Pages: the all-stores overview vs. one store's page ----
+      function showView(view) {
+        uiView = view;
+        const on = view === "overview";
+        $("overview").style.display = on ? "" : "none";
+        $("storeView").style.display = on ? "none" : "";
+        if (on) renderOverview();
+        window.scrollTo(0, 0);
+      }
+
+      // Per-store stats for the overview cards: items, units, value, low/out, sold today,
+      // revenue today. Reads the per-store cache directly (loadLS) so nothing has to be
+      // loaded into `state` first.
+      function statsFromRows(items, sales) {
+        const units = items.reduce((s, it) => s + it.qty, 0);
+        const value = items.reduce((s, it) => s + it.qty * (it.price ?? 0), 0);
+        const lowOut = items.filter((it) => statusOf(it) !== "ok");
+        const outs = lowOut.filter((it) => statusOf(it) === "out").length;
+        const today = sales.filter((s) => s.kind === "sale" && s.date === todayKey());
+        return { items: items.length, units, value, low: lowOut.length, outs, soldToday: today.reduce((n, s) => n + s.qty, 0), revToday: today.reduce((n, s) => n + s.qty * s.price, 0) };
+      }
+      function storeStats(id) {
+        return statsFromRows(loadLS(LS_STORE + id + ".items", []), loadLS(LS_STORE + id + ".sales", []));
+      }
+
+      // Cloud mode: one RLS-safe fetch of all the user's items + sales, grouped per store.
+      async function fetchCloudStats() {
+        const [{ data: items, error: e1 }, { data: sales, error: e2 }] = await Promise.all([
+          sb.from("items").select("store_id,qty,price,threshold"),
+          sb.from("sales").select("store_id,qty,price,kind,date"),
+        ]);
+        if (e1) throw e1;
+        if (e2) throw e2;
+        return { items: items || [], sales: sales || [] };
+      }
+
+      async function renderOverview() {
+        const grid = $("storesGrid");
+        const stores = signedIn() ? cloudStores : localStores();
+        let cloudRows = null;
+        if (signedIn()) {
+          grid.innerHTML = '<div class="empty"><div class="big">⏳</div><p>Loading all stores…</p></div>';
+          try {
+            cloudRows = await fetchCloudStats();
+          } catch (e) {
+            toast(`⚠️ Couldn't load store stats: ${e.message}`, 3600);
+          }
+        }
+        grid.innerHTML = "";
+        const statsFor = (s) => cloudRows
+          ? statsFromRows(cloudRows.items.filter((r) => r.store_id === s.id), cloudRows.sales.filter((r) => r.store_id === s.id))
+          : storeStats(s.id);
+        let tot = { items: 0, units: 0, value: 0, low: 0, soldToday: 0, revToday: 0 };
+        for (const s of stores) {
+          const cur = s.currency || state.currency;
+          const fmt = (n) => n.toLocaleString(undefined, { style: "currency", currency: cur });
+          const st = statsFor(s);
+          tot.items += st.items; tot.units += st.units; tot.value += st.value;
+          tot.low += st.low; tot.soldToday += st.soldToday; tot.revToday += st.revToday;
+          const card = document.createElement("div");
+          card.className = "store-card";
+          card.innerHTML = `
+            <div class="sc-top">
+              <div class="sc-emoji">🏬</div>
+              <div><div class="sc-name">${esc(s.name)}</div><div class="sc-cur">${esc(cur)}</div></div>
+              <button class="btn ghost icon sc-del" data-del="${s.id}" title="Delete store">🗑️</button>
+            </div>
+            <div class="sc-stats">
+              <div class="sc-stat"><b>${st.items}</b><span>Items</span></div>
+              <div class="sc-stat"><b>${st.units}</b><span>Units</span></div>
+              <div class="sc-stat"><b>${fmt(st.value)}</b><span>Stock value</span></div>
+            </div>
+            <div class="sc-stats">
+              <div class="sc-stat"><b class="${st.outs ? "danger" : st.low ? "warn" : ""}">${st.low}</b><span>Low / out</span></div>
+              <div class="sc-stat"><b>${st.soldToday}</b><span>Sold today</span></div>
+              <div class="sc-stat"><b>${fmt(st.revToday)}</b><span>Revenue today</span></div>
+            </div>
+            <div class="hint" style="margin:0">Click to open this store</div>`;
+          card.addEventListener("click", (e) => {
+            if (e.target.closest("[data-del]")) return;
+            openStoreFromOverview(s.id);
+          });
+          grid.appendChild(card);
+        }
+        for (const btn of grid.querySelectorAll("[data-del]")) {
+          btn.addEventListener("click", (e) => { e.stopPropagation(); deleteStore(btn.dataset.del); });
+        }
+        const head = document.createElement("div");
+        head.className = "store-card";
+        head.style.borderColor = "var(--brand)";
+        head.innerHTML = `
+          <div class="sc-top"><div class="sc-emoji">Σ</div><div><div class="sc-name">All stores</div><div class="sc-cur">${stores.length} total</div></div></div>
+          <div class="sc-stats">
+            <div class="sc-stat"><b>${tot.items}</b><span>Items</span></div>
+            <div class="sc-stat"><b>${tot.units}</b><span>Units</span></div>
+            <div class="sc-stat"><b>${fmtTot(tot.value)}</b><span>Stock value</span></div>
+          </div>
+          <div class="sc-stats">
+            <div class="sc-stat"><b class="${tot.low ? "warn" : ""}">${tot.low}</b><span>Low / out</span></div>
+            <div class="sc-stat"><b>${tot.soldToday}</b><span>Sold today</span></div>
+            <div class="sc-stat"><b>${fmtTot(tot.revToday)}</b><span>Revenue today</span></div>
+          </div>`;
+        grid.appendChild(head);
+      }
+      function fmtTot(n) { return n.toLocaleString(undefined, { style: "currency", currency: state.currency }); }
+
+      // Header + chat titles follow the active store.
+      function setBrand(name) {
+        $("brandName").textContent = `StockPilot · ${name}`;
+        $("chatHeadName").textContent = `${name} — Assistant`;
+      }
+
+      // Open one store's page from the overview card.
+      async function openStoreFromOverview(id) {
+        if (signedIn()) {
+          await switchStore(id);
+        } else if (id !== state.storeId) {
+          loadOfflineStore(id);
+        }
+        setBrand(storeNameOf(id));
+        showView("store");
+      }
+
+      // Offline active-store load: hydrate `state` from this browser's per-store cache.
+      function loadOfflineStore(storeId) {
+        state.storeId = storeId;
+        state.items = loadLS(LS_STORE + storeId + ".items", []);
+        state.sales = loadLS(LS_STORE + storeId + ".sales", []);
+        state.chat = loadLS(LS_STORE + storeId + ".chat", GREETING);
+        state.currency = loadLS("stockpilot.currency." + storeId, loadLS("stockpilot.currency", "INR"));
+        localStorage.setItem(LS_LASTSTORE, storeId);
+        resetReports();
+        applyActiveStore();
       }
 
       // Make storeId the active store: load its data, remember the choice, re-render.
       async function activateStore(storeId) {
-        await pullStoreFromCloud(storeId);
-        localStorage.setItem(LS_LASTSTORE, storeId);
-        applyActiveStore();
+        if (signedIn()) await pullStoreFromCloud(storeId);
+        else loadOfflineStore(storeId);
       }
 
+      // Create an offline store: register it and seed empty data.
+      function createStoreOffline(name) {
+        const store = { id: "local-" + uid(), name };
+        const stores = localStores();
+        stores.push(store);
+        saveLS(LS_STORES, stores);
+        saveLS(LS_STORE + store.id + ".items", []);
+        saveLS(LS_STORE + store.id + ".sales", []);
+        saveLS(LS_STORE + store.id + ".chat", GREETING);
+        return store;
+      }
+
+      // Delete a store everywhere: registry, local cache, and cloud row (cascade).
+      async function deleteStore(id) {
+        const stores = signedIn() ? cloudStores : localStores();
+        const store = stores.find((s) => s.id === id);
+        if (!store) return;
+        if (stores.length <= 1) return toast("Keep at least one store — create another before deleting this one", 3200);
+        if (!confirm(`Delete "${store.name}" and all its stock & sales? This cannot be undone.`)) return;
+        if (signedIn()) {
+          const { error } = await sb.from("stores").delete().eq("id", id);
+          if (error) return toast(`⚠️ Couldn't delete store: ${error.message}`, 3600);
+          cloudStores = cloudStores.filter((s) => s.id !== id);
+          if (state.storeId === id) await activateStore(cloudStores[0].id);
+        } else {
+          saveLS(LS_STORES, localStores().filter((s) => s.id !== id));
+          for (const k of ["items", "sales", "chat"]) localStorage.removeItem(LS_STORE + id + "." + k);
+          if (state.storeId === id) loadOfflineStore(localStores()[0].id);
+        }
+        if (uiView === "overview") renderOverview();
+        toast(`🗑️ Deleted "${store.name}"`);
+      }
+
+      // Dropdown lists every store you can open: cloud stores when signed in,
+      // otherwise the offline registry — so multi-store works without a cloud too.
       function renderStoresUI() {
         const sel = $("storeSelect");
-        sel.innerHTML = "";
-        if (!cloudStores.length) { sel.classList.add("hidden"); return; }
-        sel.classList.remove("hidden");
-        for (const s of cloudStores) {
+        const stores = signedIn() ? cloudStores : localStores();
+        if (!stores.length) { sel.style.display = "none"; return; }
+        sel.style.display = "";
+        for (const s of stores) {
           const o = document.createElement("option");
           o.value = s.id;
           o.textContent = s.name;
@@ -930,7 +1234,7 @@
         if (storeId === state.storeId) return;
         try {
           await activateStore(storeId);
-          toast(`Switched to ${cloudStores.find((s) => s.id === storeId)?.name || "store"}`);
+          toast(`Switched to ${storeNameOf(storeId)}`);
         } catch (e) {
           toast(`⚠️ Couldn't load store: ${e.message}`, 3600);
         }
@@ -998,15 +1302,46 @@
       $("addStoreBtn").addEventListener("click", async () => {
         const name = prompt("Name for the new store:", "");
         if (!name || !name.trim()) return;
-        try {
-          const row = { id: uid(), user_id: cloudUser.id, name: name.trim(), currency: state.currency };
-          const { error } = await sb.from("stores").insert(row);
-          if (error) throw error;
-          cloudStores.push(row);
-          await activateStore(row.id);
-          toast(`✅ Store "${row.name}" created — empty, ready for its own stock`);
-        } catch (e) {
-          toast(`⚠️ Couldn't create store: ${e.message}`, 3600);
+        if (signedIn()) {
+          try {
+            const row = { id: uid(), user_id: cloudUser.id, name: name.trim(), currency: state.currency };
+            const { error } = await sb.from("stores").insert(row);
+            if (error) throw error;
+            cloudStores.push(row);
+            await activateStore(row.id);
+            toast(`✅ Store "${row.name}" created — empty, ready for its own stock`);
+          } catch (e) {
+            toast(`⚠️ Couldn't create store: ${e.message}`, 3600);
+          }
+        } else {
+          const st = createStoreOffline(name.trim());
+          renderStoresUI();
+          activateStore(st.id);
+          toast(`✅ Store "${st.name}" created — you're now in it (🏬 Stores for the overview)`);
+        }
+      });
+
+      // All-stores overview page: open, close, and create-from-overview.
+      $("storesBtn").addEventListener("click", () => showView("overview"));
+      $("overviewClose").addEventListener("click", () => showView("store"));
+      $("storeCreate").addEventListener("click", async () => {
+        const name = prompt("Name for the new store:", "");
+        if (!name || !name.trim()) return;
+        if (signedIn()) {
+          try {
+            const row = { id: uid(), user_id: cloudUser.id, name: name.trim(), currency: state.currency };
+            const { error } = await sb.from("stores").insert(row);
+            if (error) throw error;
+            cloudStores.push(row);
+            renderOverview();
+            toast(`✅ Store "${row.name}" created`);
+          } catch (e) {
+            toast(`⚠️ Couldn't create store: ${e.message}`, 3600);
+          }
+        } else {
+          createStoreOffline(name.trim());
+          renderOverview();
+          toast(`✅ Store "${name.trim()}" created — click its card to open it`);
         }
       });
       $("storeSelect").addEventListener("change", (e) => switchStore(e.target.value));
@@ -1041,7 +1376,7 @@
       });
 
       // ================= Currency =================
-      const CURRENCIES = ["USD", "EUR", "GBP", "INR", "AED", "SAR", "PKR", "BDT", "NGN", "CAD", "AUD", "JPY", "KES", "ZAR", "PHP"];
+      const CURRENCIES = ["INR", "USD", "EUR", "GBP", "AED", "SAR", "PKR", "BDT", "NGN", "CAD", "AUD", "JPY", "KES", "ZAR", "PHP"];
       const currencySelect = $("currencySelect");
       for (const c of CURRENCIES) {
         const o = document.createElement("option");
@@ -1049,7 +1384,7 @@
         o.textContent = c;
         currencySelect.appendChild(o);
       }
-      currencySelect.value = CURRENCIES.includes(state.currency) ? state.currency : "USD";
+      currencySelect.value = CURRENCIES.includes(state.currency) ? state.currency : "INR";
       currencySelect.addEventListener("change", (e) => {
         state.currency = e.target.value;
         const st = cloudStores.find((s) => s.id === state.storeId);
@@ -1059,8 +1394,8 @@
           sb.from("stores").update({ currency: state.currency }).eq("id", st.id)
             .then(({ error }) => { if (error) console.warn("currency sync failed", error.message); });
         } else {
-          // Offline store: JSON-encoded so loadLS() can read it back.
-          localStorage.setItem("stockpilot.currency", JSON.stringify(state.currency));
+          // Offline store: per-store key (JSON-encoded so loadLS() can read it back).
+          localStorage.setItem("stockpilot.currency." + state.storeId, JSON.stringify(state.currency));
         }
         saveAll();
         render();
@@ -1125,6 +1460,7 @@
           pushChat("bot", reply);
           saveAll();
           render();
+          refreshReports();
           sendChat.pending = false;
         }, 220);
       }
@@ -1274,26 +1610,7 @@
       }
 
       function reportReply(span) {
-        const label = spanLabel(span);
-        const rows = salesIn(span);
-        const sales = rows.filter((s) => s.kind === "sale");
-        const uses = rows.filter((s) => s.kind === "use");
-        const top = topItems(sales);
-        const units = sales.reduce((n, s) => n + s.qty, 0);
-        const revenue = sales.reduce((n, s) => n + s.qty * s.price, 0);
-
-        const lines = [`📊 ${label} — sales report:`, `   Sold: ${units} unit${units === 1 ? "" : "s"} · ${money(revenue)}`];
-        if (uses.length) {
-          const useQty = uses.reduce((n, s) => n + s.qty, 0);
-          lines.push(`   Store use: ${useQty} unit${useQty === 1 ? "" : "s"} (not sales)`);
-        }
-        if (top.length) {
-          lines.push("   Top items:");
-          for (const [name, v] of top.slice(0, 5)) lines.push(`   • ${name} — ${v.qty} sold (${money(v.revenue)})`);
-        } else {
-          lines.push("   No sales in this period.");
-        }
-        return lines.join("\n");
+        return reportText(span);
       }
 
       // Profit = revenue − (units sold × per-item cost). Items without a cost
@@ -1364,6 +1681,88 @@
         return createItem(name, qty, price, threshold, category, description, cost);
       }
 
+      // ================= Reports panel (Daily / Weekly / Monthly / Custom) =================
+      // One shared builder: chat replies and the on-page panel both render this,
+      // so the numbers can never disagree.
+      function reportText(span, from, to) {
+        let rows, label;
+        if (span === "custom") {
+          const ok = (s) => !!s && s.length === 10 && !isNaN(Date.parse(s));
+          if (!ok(from) || !ok(to)) return '🤔 Give me two dates, e.g. "report from 2026-09-01 to 2026-09-07".';
+          if (from > to) { const tmp = from; from = to; to = tmp; }
+          rows = state.sales.filter((s) => s.date >= from && s.date <= to);
+          label = `${from} → ${to}`;
+        } else {
+          rows = salesIn(span);
+          label = spanLabel(span);
+        }
+        const sales = rows.filter((s) => s.kind === "sale");
+        const uses = rows.filter((s) => s.kind === "use");
+        const top = topItems(sales);
+        const units = sales.reduce((n, s) => n + s.qty, 0);
+        const revenue = sales.reduce((n, s) => n + s.qty * s.price, 0);
+        const lines = [`📊 ${label} — sales report:`, `   Sold: ${units} unit${units === 1 ? "" : "s"} · ${money(revenue)}`];
+        if (uses.length) {
+          const useQty = uses.reduce((n, s) => n + s.qty, 0);
+          lines.push(`   Store use: ${useQty} unit${useQty === 1 ? "" : "s"} (not sales)`);
+        }
+        if (top.length) {
+          lines.push("   Top items:");
+          for (const [name, v] of top.slice(0, 5)) lines.push(`   • ${name} — ${v.qty} sold (${money(v.revenue)})`);
+        } else {
+          lines.push("   No sales in this period.");
+        }
+        return lines.join("\n");
+      }
+
+      // On-page panel: mirrors the selected segment (Daily/Weekly/Monthly/Custom).
+      let rpSpan = "day";
+      function renderReportPanel() {
+        const out = $("rpOutput");
+        if (!out) return;
+        out.textContent = rpSpan === "custom"
+          ? reportText("custom", $("rpFrom").value, $("rpTo").value)
+          : reportText(rpSpan);
+        out.classList.add("show");
+      }
+
+      // Reset the panel whenever the active store changes — a store must never
+      // show another store's report. Default view: today.
+      function resetReports() {
+        rpSpan = "day";
+        const seg = $("rpSeg");
+        if (seg) for (const b of seg.querySelectorAll("button[data-span]")) b.classList.toggle("active", b.dataset.span === "day");
+        const cust = $("rpCustom");
+        if (cust) cust.style.display = "none";
+        const from = $("rpFrom");
+        const to = $("rpTo");
+        if (from) from.value = todayKey(6);
+        if (to) to.value = todayKey(0);
+        renderReportPanel();
+      }
+
+      function refreshReports() {
+        if (uiView === "store") renderReportPanel();
+      }
+
+      (function wireReportPanel() {
+        const seg = $("rpSeg");
+        if (!seg) return;
+        for (const b of seg.querySelectorAll("button[data-span]")) {
+          b.addEventListener("click", () => {
+            rpSpan = b.dataset.span;
+            for (const x of seg.querySelectorAll("button[data-span]")) x.classList.toggle("active", x === b);
+            $("rpCustom").style.display = rpSpan === "custom" ? "" : "none";
+            renderReportPanel();
+          });
+        }
+        $("rpApply").addEventListener("click", () => {
+          if (!$("rpFrom").value || !$("rpTo").value) { toast("Pick both a From and a To date"); return; }
+          rpSpan = "custom";
+          renderReportPanel();
+        });
+      })();
+
       const ROUTES = [
         {
           match: (x, t) => /^(help|what can you do\??|commands\??)$/.test(t),
@@ -1373,6 +1772,11 @@
           help: '• "profit this week" — revenue minus per-item cost',
           match: (x, t) => /profit|margin/.test(t),
           run: (x, t) => profitReply(detectSpan(t)),
+        },
+        {
+          help: '• "report from 2026-09-01 to 2026-09-07" — sales for any date range',
+          match: (x, t) => t.match(/report\s+from\s+(\S+)\s+to\s+(\S+)/),
+          run: (m) => reportText("custom", m[1], m[2]),
         },
         {
           help: '• "daily report" / "weekly report" / "monthly report"',
@@ -1616,6 +2020,7 @@
       document.addEventListener("keydown", (e) => {
         const tag = e.target.tagName;
         if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA" || e.target.isContentEditable) return;
+        if (uiView !== "store") return; // shortcuts only on a store page
         if (e.key === "n" || e.key === "N") openDialog(null);
         if (e.key === "/") { e.preventDefault(); openChat(); }
       });
@@ -1625,7 +2030,9 @@
 
       // Offline mode: no cloud configured, or the user chose "Continue without cloud".
       function bootOffline() {
-        state.storeId = "local-default";
+        const reg = localStores();
+        const last = localStorage.getItem(LS_LASTSTORE);
+        state.storeId = reg.some((s) => s.id === last) ? last : (reg[0] && reg[0].id) || "local-default";
         // One-time migration from the pre-cloud single-store keys so existing data survives.
         const NI = LS_STORE + "local-default.items", NS = LS_STORE + "local-default.sales", NC = LS_STORE + "local-default.chat";
         if (localStorage.getItem("stockpilot.items.v1") && !localStorage.getItem(NI)) {
@@ -1633,14 +2040,17 @@
           localStorage.setItem(NS, localStorage.getItem("stockpilot.sales.v1") || "[]");
           localStorage.setItem(NC, localStorage.getItem("stockpilot.chat.v1") || "[]");
         }
-        state.items = loadLS(NI, []);
-        state.sales = loadLS(NS, []);
-        state.currency = loadLS("stockpilot.currency", "USD");
-        state.chat = loadLS(NC, GREETING);
-        currencySelect.value = CURRENCIES.includes(state.currency) ? state.currency : "USD";
+        state.items = loadLS(LS_STORE + state.storeId + ".items", []);
+        state.sales = loadLS(LS_STORE + state.storeId + ".sales", []);
+        state.chat = loadLS(LS_STORE + state.storeId + ".chat", GREETING);
+        state.currency = loadLS("stockpilot.currency." + state.storeId, loadLS("stockpilot.currency", "INR"));
+        currencySelect.value = CURRENCIES.includes(state.currency) ? state.currency : "INR";
         render();
         renderChat();
+        resetReports();
+        setBrand(storeNameOf(state.storeId));
         startupAlert();
+        applySessionUI();
       }
 
       (async function boot() {
