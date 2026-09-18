@@ -755,6 +755,7 @@
         state.currency = cloudStores.find((s) => s.id === storeId)?.currency || "INR";
         resetReports();
         saveAll(); // cache locally so the all-stores overview shows this store's real numbers
+        runAutoPrune(); // prune sales older than 6 months (state + local caches + cloud)
       }
 
       // Best-effort cloud delete — without it the next pull resurrects the deleted item.
@@ -764,6 +765,109 @@
           const { error } = await sb.from(table).delete().eq("id", id);
           if (error) throw error;
         } catch (e) { console.warn("cloud delete failed", e.message); }
+      }
+
+      // ================= Auto data cleanup =================
+      // The sales log is the only ever-growing data, so records older than ~6 months
+      // are pruned from `state`, every local cache, and the cloud. Items (current
+      // stock) are never touched; chat is already capped at 200 messages in saveAll().
+      const RETENTION_DAYS = 183; // ~6 months
+      const LS_LAST_PRUNE = "stockpilot.lastPrune";
+
+      // Oldest date (YYYY-MM-DD) that survives cleanup.
+      function pruneCutoffDate() {
+        const d = new Date();
+        d.setDate(d.getDate() - RETENTION_DAYS);
+        return d.toLocaleDateString("en-CA");
+      }
+
+      // Undated legacy rows can't be aged, so they are kept.
+      function isStale(s, cutoff) {
+        return !!s.date && s.date < cutoff;
+      }
+
+      // Prune the active store's in-memory sales log. Returns number removed.
+      function pruneStateSales() {
+        const cutoff = pruneCutoffDate();
+        const keep = state.sales.filter((s) => !isStale(s, cutoff));
+        const removed = state.sales.length - keep.length;
+        if (removed > 0) state.sales = keep;
+        return removed;
+      }
+
+      // Prune one store's local cache (for stores that are not currently loaded).
+      function pruneLocalSalesCache(key, cutoff) {
+        try {
+          const rows = JSON.parse(localStorage.getItem(key) || "[]");
+          if (!Array.isArray(rows)) return 0;
+          const keep = rows.filter((s) => !isStale(s, cutoff));
+          if (keep.length === rows.length) return 0;
+          saveLS(key, keep);
+          return rows.length - keep.length;
+        } catch {
+          return 0;
+        }
+      }
+
+      // Every per-store sales cache in this browser, except the active store's
+      // (its data lives in `state` and is persisted by saveAll when pruned).
+      function pruneAllLocalSalesCaches(exceptId) {
+        const cutoff = pruneCutoffDate();
+        let removed = 0;
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (!key || !key.startsWith(LS_STORE) || !key.endsWith(".sales")) continue;
+          if (key === LS_STORE + exceptId + ".sales") continue;
+          removed += pruneLocalSalesCache(key, cutoff);
+        }
+        return removed;
+      }
+
+      // Cloud twin: delete this user's sales older than the cutoff (the RLS
+      // "own sales" policy limits it to the signed-in account). Returns count.
+      async function pruneCloudSales() {
+        const { data, error } = await sb.from("sales").delete().lt("date", pruneCutoffDate()).select("id");
+        if (error) throw error;
+        return (data || []).length;
+      }
+
+      // Full cleanup, at most once a day (per browser). Fire-and-forget from the
+      // boot paths; failures are non-fatal and retried the next day.
+      async function runAutoPrune() {
+        const last = Number(localStorage.getItem(LS_LAST_PRUNE) || 0);
+        if (Date.now() - last < 24 * 60 * 60 * 1000) return;
+        localStorage.setItem(LS_LAST_PRUNE, String(Date.now()));
+        try {
+          const activeRemoved = pruneStateSales();
+          const otherRemoved = pruneAllLocalSalesCaches(state.storeId);
+          if (activeRemoved > 0) saveAll(); // persists the pruned active store
+          if (activeRemoved + otherRemoved > 0) {
+            toast(`🧹 Auto-cleanup: removed ${activeRemoved + otherRemoved} sales record(s) older than 6 months`, 3200);
+          }
+          if (cloudActive()) {
+            const cloud = await pruneCloudSales();
+            if (cloud > 0) toast(`☁️ Auto-cleanup: deleted ${cloud} old cloud record(s)`, 3200);
+          }
+        } catch (e) {
+          console.warn("auto-prune failed", e && e.message);
+        }
+      }
+
+      // Manual trigger via chat: same cleanup as the daily auto-prune, immediately.
+      function cleanOldDataReply() {
+        const cutoff = pruneCutoffDate();
+        return confirmFirst(`Delete all sales older than 6 months (before ${cutoff})? This cannot be undone.`, () => {
+          const removed = pruneStateSales();
+          if (removed > 0) saveAll();
+          if (cloudActive()) {
+            pruneCloudSales()
+              .then((n) => { if (n > 0) toast(`Cloud cleanup: deleted ${n} old record(s)`, 3200); })
+              .catch((e) => toast(`Cloud cleanup failed: ${e.message}`, 3600));
+          }
+          return removed > 0
+            ? `Deleted ${removed} sales record(s) from before ${cutoff}.`
+            : `Nothing to clean - no sales older than ${cutoff}.`;
+        });
       }
 
       function uid() {
@@ -1173,6 +1277,7 @@
         localStorage.setItem(LS_LASTSTORE, storeId);
         resetReports();
         applyActiveStore();
+        runAutoPrune(); // prune sales older than 6 months (state + local caches)
       }
 
       // Make storeId the active store: load its data, remember the choice, re-render.
@@ -1271,6 +1376,7 @@
         hideAuth();
         applySessionUI();
         applyActiveStore();
+        runAutoPrune(); // prune sales older than 6 months (state + local caches + cloud)
         toast(`☁️ Signed in — ${cloudStores.length} store${cloudStores.length === 1 ? "" : "s"} loaded`, 3200);
       }
 
@@ -1295,6 +1401,7 @@
         hideAuth();
         applySessionUI();
         bootOffline();
+        runAutoPrune(); // prune sales older than 6 months (state + local caches)
         toast("Offline mode — data stays on this browser", 3000);
       });
       $("signinBtn").addEventListener("click", () => showAuth(true));
@@ -1485,7 +1592,7 @@
       // command list can't drift from what actually routes.
 
       function helpReply() {
-        return ["Here's what I can do:", ...ROUTES.filter((r) => r.help).map((r) => r.help)].join("\n");
+        return ["Here's what I can do:", '• "clean old data" - delete sales older than 6 months (auto-cleanup also runs daily)', ...ROUTES.filter((r) => r.help).map((r) => r.help)].join("\n");
       }
 
       function findItem(name) {
@@ -2007,6 +2114,11 @@
             return "Cancelled — nothing changed.";
           }
           return `Still waiting on: ${pendingConfirm.describe}\nReply "yes" to confirm or "no" to cancel.`;
+        }
+        // Manual cleanup command - dispatched before ROUTES so "delete old data"
+        // is never swallowed by the "delete pens" route.
+        if (/^(?:clean|clear|purge|wipe|delete)\s+(?:out\s+)?(?:old|expired)\s+(?:data|sales|history|records|logs)$/.test(t)) {
+          return cleanOldDataReply();
         }
         for (const route of ROUTES) {
           const params = route.match(text, t);
