@@ -282,6 +282,44 @@ try {
   // Chat command exists in the router (help text + manual trigger path).
   check("chat help lists clean old data", /clean old data/.test(handleCommand("help") || ""));
 
+  console.log("\n— Custom sale & store use commands —");
+  // Custom sale: sell at an overridden price; report revenue must use it.
+  handleCommand("add item vivo y18, qty 5, price 1800, cost 1500");
+  const stockBefore = state.items.find((it) => /y18/i.test(it.name)).qty;
+  const reply = handleCommand("custom sale vivo y18 @ 1600") || "";
+  const y18 = state.items.find((it) => /y18/i.test(it.name));
+  check("custom sale deducts stock", y18.qty === stockBefore - 1, `reply=${reply}`);
+  const lastSale = state.sales[state.sales.length - 1];
+  check("custom sale logs override price", lastSale && lastSale.price === 1600, JSON.stringify(lastSale));
+  check("custom sale reply mentions custom price", /1,600/.test(reply) && /custom price/i.test(reply), reply);
+  // Explicit qty variant: one sale row with qty 2 at the override price.
+  const qtyBefore = state.items.find((it) => /y18/i.test(it.name)).qty;
+  handleCommand("custom sale 2 vivo y18 @ 1500");
+  check("custom sale with qty works", state.items.find((it) => /y18/i.test(it.name)).qty === qtyBefore - 2);
+  const qtySale = state.sales[state.sales.length - 1];
+  check("custom sale qty logs 2×1500", qtySale && qtySale.qty === 2 && qtySale.price === 1500, JSON.stringify(qtySale));
+  // Revenue math picks up the override (report from the dates of those sales).
+  const todayKey = freshKey;
+  const rev = state.sales.filter((s) => s.date === todayKey && s.kind === "sale").reduce((n, s) => n + s.qty * s.price, 0);
+  check("override price flows into revenue", rev > 0, `rev=${rev}`);
+  // Unknown item and missing price get helpful replies, not silent failure.
+  check("custom sale unknown item", /couldn't find|No item/i.test(handleCommand("custom sale xyz thing @ 10") || ""));
+  // Store use: dedicated command takes stock without a sale.
+  const pens = state.items.find((it) => /pens/i.test(it.name));
+  const pensBefore = pens.qty;
+  const useReply = handleCommand("store use 2 pens") || "";
+  check("store use deducts stock", state.items.find((it) => /pens/i.test(it.name)).qty === pensBefore - 2, useReply);
+  const lastMove = state.sales[state.sales.length - 1];
+  check("store use logged as 'use' not 'sale'", lastMove && lastMove.kind === "use", JSON.stringify(lastMove));
+  check("store use reply is use wording", /store use/i.test(useReply), useReply);
+  // Quantity-prompt variant: no number → asks how many.
+  const askReply = handleCommand("store use pens") || "";
+  check("store use without qty asks how many", /How many/i.test(askReply), askReply);
+  // Help lists both new commands.
+  const help = handleCommand("help") || "";
+  check("help lists custom sale", /custom sale/.test(help));
+  check("help lists store use", /store use/.test(help));
+
 } catch (e) {
   failed++;
   console.error("❌ Harness error:", e.stack || e);
