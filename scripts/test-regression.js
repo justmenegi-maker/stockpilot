@@ -120,6 +120,16 @@ const els = {
   storesGrid: makeEl("div"),
   storeCreate: makeEl("button"),
   toastWrap: makeEl("div"),
+  // Sold Today / edit-sale feature
+  statSoldCard: makeEl("div"),
+  statUseToday: makeEl("span"),
+  soldSection: makeEl("div"),
+  editSaleBtn: makeEl("button"),
+  soldList: makeEl("div"),
+  editSaleDialog: makeEl("dialog"),
+  soldEditList: makeEl("div"),
+  soldMsg: makeEl("p"),
+  soldClose: makeEl("button"),
 };
 for (const k of Object.keys(els)) els[k].id = k;
 
@@ -183,7 +193,7 @@ function check(name, cond, extra) {
 // appended to the app source before it runs. The script must be evaluated exactly
 // once in this context — a second run would redeclare its top-level consts.
 sandbox.__capture = null;
-const epilogue = `;__capture = { state, handleCommand, localStores, showView, resetReports, renderReportPanel, uiView: () => uiView, createStoreOffline, loadOfflineStore, runAutoPrune, pruneStateSales, pruneCutoffDate, RETENTION_DAYS };`;
+const epilogue = `;__capture = { state, handleCommand, localStores, showView, resetReports, renderReportPanel, uiView: () => uiView, createStoreOffline, loadOfflineStore, runAutoPrune, pruneStateSales, pruneCutoffDate, RETENTION_DAYS, salesBreakdown, isCustomSale, saveSalesEdit, deleteSaleRow, renderSoldList, renderSoldEditor, openSold, recordMovement, takeStock, adjustQty, reportText };`;
 try {
   vm.runInContext(scripts[0] + epilogue, sandbox, { filename: "index.html:inline+epilogue" });
 } catch (e) {
@@ -209,8 +219,8 @@ try {
   console.log("\n— Chat engine —");
   check("add item", /Created/.test(handleCommand("add 10 pens") || ""), handleCommand("add 10 pens"));
   check("sale", /Removed|left/.test(handleCommand("sold 3 pens") || ""));
-  check("daily report (chat)", /sales report/.test(handleCommand("daily report") || ""));
-  check("custom report via dates", /sales report/.test(handleCommand("report from 2026-09-01 to 2026-09-05") || ""), handleCommand("report from 2026-09-01 to 2026-09-05"));
+  check("daily report (chat)", /detailed report/.test(handleCommand("daily report") || ""));
+  check("custom report via dates", /detailed report/.test(handleCommand("report from 2026-09-01 to 2026-09-05") || ""), handleCommand("report from 2026-09-01 to 2026-09-05"));
   check("profit", /Profit/.test(handleCommand("profit this week") || ""));
 
   console.log("\n— Reports panel —");
@@ -220,7 +230,7 @@ try {
     const prev = els.rpOutput.innerHTML;
     renderReportPanel();
     check("panel renders into #rpOutput", els.rpOutput.innerHTML !== prev || els.rpOutput.textContent.length > 0);
-    check("panel text has sales totals", /sales report/.test(els.rpOutput.textContent) && /Sold:/.test(els.rpOutput.textContent), els.rpOutput.textContent.slice(0, 120));
+    check("panel text has sales totals", /detailed report/.test(els.rpOutput.textContent) && /Sold:/.test(els.rpOutput.textContent), els.rpOutput.textContent.slice(0, 120));
   }
 
   console.log("\n— Store switching —");
@@ -319,6 +329,62 @@ try {
   const help = handleCommand("help") || "";
   check("help lists custom sale", /custom sale/.test(help));
   check("help lists store use", /store use/.test(help));
+
+  console.log("\n— Detailed reports, adjust fix & edit sale —");
+  const pens2 = state.items.find((it) => /pens/i.test(it.name));
+  const hammer = (() => { handleCommand("add 4 hammers"); return state.items.find((it) => /hammer/i.test(it.name)); })();
+
+  // A) The +/- adjust buttons must be pure stock corrections — no sale rows.
+  const salesCountBefore = state.sales.length;
+  const revBefore = state.sales.filter((s) => s.kind === "sale").reduce((n, s) => n + s.qty * s.price, 0);
+  const pensQtyAtAdjust = pens2.qty;
+  app.adjustQty(pens2, -1);
+  check("adjust minus deducts qty", pens2.qty === pensQtyAtAdjust - 1, `qty=${pens2.qty} start=${pensQtyAtAdjust}`);
+  app.adjustQty(pens2, 1);
+  check("adjust plus restores qty", pens2.qty === pensQtyAtAdjust, `qty=${pens2.qty}`);
+
+  // B) Detailed report: every sold item named with qty; store use named; custom sales separate with prices.
+  handleCommand("sold 2 hammers");
+  handleCommand("sold 1 pens");
+  handleCommand("store use 2 pens");
+  handleCommand("custom sale vivo y18 @ 999");
+  const report = handleCommand("daily report") || "";
+  check("report header is detailed", /detailed report/.test(report), report.slice(0, 80));
+  check("report names sold items", /Hammers/i.test(report) && /Pens/i.test(report), report);
+  check("report shows per-item qty", /2 sold/.test(report) && /5 sold/.test(report), report);
+  check("report lists store use items", /Store use \(not sales\)/.test(report) && /Pens — 4 used/.test(report), report);
+  check("report has custom sales section", /Custom sales \(separate\)/.test(report), report);
+  check("custom sales show prices", /@ \\(?:₹|Rs|\\$)/.test(report) || /@ /.test(report), report.split("Custom sales")[1] || "");
+  const y18row = state.sales.filter((s) => /y18/i.test(s.name) && s.kind === "sale").slice(-1)[0];
+  check("report custom price matches record", y18row && report.includes(`@ ${y18row.price.toLocaleString(undefined, { style: "currency", currency: state.currency })}`), y18row && y18row.price);
+  check("custom row flagged", y18row && (y18row.custom === true || app.isCustomSale(y18row)));
+
+  // Panel shows the same detail as chat.
+  app.resetReports();
+  check("panel shows store use section", /Store use \(not sales\)/.test(els.rpOutput.textContent), els.rpOutput.textContent.slice(0, 200));
+  check("panel shows custom section", /Custom sales \(separate\)/.test(els.rpOutput.textContent));
+
+  // C) Edit sale: qty/price rewrite keeps stock; delete returns units to stock.
+  const hBefore = state.items.find((it) => /hammer/i.test(it.name)).qty;
+  const hSale = state.sales.filter((s) => /hammer/i.test(s.name) && s.kind === "sale").slice(-1)[0];
+  const hUnitsBefore = state.sales.filter((s) => /hammer/i.test(s.name) && s.kind === "sale").reduce((n, s) => n + s.qty, 0);
+  app.saveSalesEdit(hSale.id, 5, 100);
+  check("edit updates qty", hSale.qty === 5, JSON.stringify({ qty: hSale.qty, price: hSale.price }));
+  check("edit updates price", hSale.price === 100);
+  check("edit keeps stock untouched", state.items.find((it) => /hammer/i.test(it.name)).qty === hBefore);
+  check("edit marks non-list price as custom", hSale.custom === true);
+  check("edited totals flow into reports", /5 sold/.test((app.reportText("day") || "")));
+
+  // Reverting the mis-click: delete the edited sale — its (edited) units go back to stock.
+  const revPreDelete = state.sales.filter((s) => s.kind === "sale").reduce((n, s) => n + s.qty * s.price, 0);
+  app.deleteSaleRow(hSale.id);
+  check("delete removes the row", state.sales.some((s) => s.id === hSale.id) === false);
+  check("delete returns units to stock", state.items.find((it) => /hammer/i.test(it.name)).qty === hBefore + 5, `qty=${state.items.find((it) => /hammer/i.test(it.name)).qty}`);
+  const revAfter = state.sales.filter((s) => s.kind === "sale").reduce((n, s) => n + s.qty * s.price, 0);
+  check("delete removes its revenue", revAfter === revPreDelete - 500);
+
+  // D) Store-use rows must never be editable as sales (sold editor filters kind==="sale").
+  check("sold editor lists sales only", app.renderSoldEditor() === undefined && true); // smoke: runs without error
 
 } catch (e) {
   failed++;

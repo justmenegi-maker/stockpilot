@@ -100,6 +100,33 @@
       }
       .stat .label { font-size: 11px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
       .stat .value { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+      .sold-section { margin-bottom: 16px; }
+      .sold-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+      .sold-head h3 { margin: 0; font-size: 15px; }
+      .sold-list { display: flex; flex-direction: column; gap: 6px; }
+      .sold-row {
+        display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+        background: var(--panel); border: 1px solid var(--line);
+        border-radius: 10px; padding: 8px 12px; font-size: 13.5px;
+      }
+      .sold-row .s-name { font-weight: 700; }
+      .sold-row .s-price { font-variant-numeric: tabular-nums; }
+      .sold-row .s-tag {
+        font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em;
+        padding: 2px 7px; border-radius: 999px;
+        background: color-mix(in srgb, var(--brand) 14%, transparent); color: var(--brand);
+      }
+      .sold-empty { color: var(--muted); font-size: 13px; padding: 6px 2px; }
+      .sold-edit-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+      .sold-edit { border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+      .sold-edit .s-line { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+      .sold-edit input[type="number"] {
+        border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px;
+        background: var(--panel); color: var(--ink); outline: none; width: 92px; font-size: 13px;
+      }
+      .sold-edit input:focus { border-color: var(--brand); }
+      .sold-edit .s-actions { display: flex; gap: 8px; margin-top: 2px; }
+      .rp-report { white-space: pre-wrap; }
       .value.ok { color: var(--ok); }
       .value.danger { color: var(--danger); }
       .toolbar { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
@@ -462,7 +489,19 @@
         <div class="stat"><span class="label">Units in Stock</span><span class="value" id="statUnits">0</span></div>
         <div class="stat"><span class="label">Stock Value</span><span class="value" id="statValue">$0</span></div>
         <div class="stat"><span class="label">Low / Out of Stock</span><span class="value danger" id="statLow">0</span></div>
-        <div class="stat"><span class="label">Sold Today</span><span class="value ok" id="statSoldToday">0</span></div>
+        <div class="stat" id="statSoldCard" title="Click to edit today's sales" style="cursor:pointer"><span class="label">Sold Today</span><span class="value ok" id="statSoldToday">0</span></div>
+        <div class="stat"><span class="label">Store Use Today</span><span class="value" id="statUseToday">0</span></div>
+      </div>
+
+      <!-- Sold Today: per-sale log for the active store with inline edit/delete.
+           Editing qty/price fixes mis-clicks (wrong qty or a custom price); deleting
+           a row puts the units back into stock. -->
+      <div class="sold-section" id="soldSection">
+        <div class="sold-head">
+          <h3>🧾 Sold Today</h3>
+          <button class="btn ghost" id="editSaleBtn" title="Edit or delete today's sales">✏️ Edit sales</button>
+        </div>
+        <div class="sold-list" id="soldList"></div>
       </div>
 
       <div class="toolbar">
@@ -557,6 +596,19 @@
         <div class="dialog-actions">
           <button class="btn" id="dialogCancel">Cancel</button>
           <button class="btn primary" id="dialogSave">Save</button>
+        </div>
+      </div>
+    </dialog>
+
+    <!-- Edit sale: fix qty/price of a recorded sale (mis-click recovery). Deleting
+         a row returns its units to stock; saving keeps stock untouched. -->
+    <dialog id="editSaleDialog">
+      <div class="dialog-body">
+        <h3>Edit sale record</h3>
+        <p id="soldMsg" class="hint" style="margin:0 0 10px">Fix the quantity or price, or delete a row to return its units to stock.</p>
+        <div id="soldEditList" class="sold-edit-list"></div>
+        <div class="dialog-actions">
+          <button class="btn" id="soldClose">Close</button>
         </div>
       </div>
     </dialog>
@@ -699,6 +751,7 @@
         saveLS(LS_STORE + state.storeId + ".items", state.items);
         saveLS(LS_STORE + state.storeId + ".chat", state.chat.slice(-200));
         saveLS(LS_STORE + state.storeId + ".sales", state.sales);
+        if (typeof renderSoldList === "function") renderSoldList(); // Sold Today stays current after chat commands too
         if (cloudActive()) syncStoreToCloud().catch((e) => console.warn("cloud sync failed", e.message));
       }
 
@@ -719,7 +772,7 @@
         }));
         const salesRows = state.sales.map((s) => ({
           id: s.id, user_id: cloudUser.id, store_id: sid, item_id: s.itemId, name: s.name,
-          qty: s.qty, price: s.price, kind: s.kind, ts: new Date(s.ts).toISOString(), date: s.date,
+          qty: s.qty, price: s.price, kind: s.kind, custom: !!s.custom, ts: new Date(s.ts).toISOString(), date: s.date,
         }));
         const chatRow = { id: sid, user_id: cloudUser.id, store_id: sid, messages: state.chat.slice(-200), updated_at: new Date().toISOString() };
         const [r1, r2, r3] = await Promise.all([
@@ -749,7 +802,7 @@
         }));
         state.sales = (sales || []).map((r) => ({
           id: r.id, itemId: r.item_id, name: r.name, qty: r.qty, price: Number(r.price),
-          kind: r.kind, ts: Date.parse(r.ts), date: r.date,
+          kind: r.kind, custom: !!r.custom, ts: Date.parse(r.ts), date: r.date,
         }));
         state.chat = (chats && chats[0] && chats[0].messages) || GREETING;
         state.currency = cloudStores.find((s) => s.id === storeId)?.currency || "INR";
@@ -953,6 +1006,7 @@
         $("statValue").textContent = money(value);
         $("statLow").textContent = lowOut.length;
         $("statSoldToday").textContent = state.sales.filter((s) => s.kind === "sale" && s.date === todayKey()).reduce((n, s) => n + s.qty, 0);
+        $("statUseToday").textContent = state.sales.filter((s) => s.kind === "use" && s.date === todayKey()).reduce((n, s) => n + s.qty, 0);
 
         const badge = $("alertBadge");
         if (lowOut.length > 0) {
@@ -1036,6 +1090,121 @@
       $("dialogCancel").addEventListener("click", () => $("itemDialog").close());
       $("addItemBtn").addEventListener("click", () => openDialog(null));
 
+      // ================= Sold Today (list + edit/delete sale records) =================
+      // A sale row is the unit of truth for reports; this editor fixes mis-clicks:
+      // wrong quantity, wrong (custom) price, or a sale that should not exist at all.
+      function soldReply(openEditor) {
+        const sec = document.getElementById("soldSection");
+        if (sec) sec.style.display = "";
+        renderSoldList();
+        if (openEditor) openSold(false);
+      }
+
+      function renderSoldList() {
+        const el = document.getElementById("soldList");
+        if (!el) return;
+        const rows = state.sales.filter((s) => s.date === todayKey());
+        if (!rows.length) { el.innerHTML = '<div class="sold-empty">No sales or store use today yet.</div>'; return; }
+        el.innerHTML = rows.map((s) => {
+          const tag = s.kind === "use" ? '<span class="s-tag">store use</span>' : s.custom === true || isCustomSale(s) ? '<span class="s-tag">custom price</span>' : "";
+          const priceNote = s.kind === "use" ? "" : ` · ${money(s.qty * s.price)}`;
+          return `<div class="sold-row"><span class="s-name">${esc(s.name)}</span><span>× ${s.qty}</span><span class="s-price">${money(s.price)} each${priceNote}</span>${tag}</div>`;
+        }).join("");
+      }
+
+      function openSold(withMsg) {
+        const dlg = document.getElementById("editSaleDialog");
+        if (!dlg) return;
+        renderSoldEditor();
+        if (withMsg !== false && document.getElementById("soldMsg")) {
+          document.getElementById("soldMsg").textContent = "Fix the quantity or price, or delete a row to return its units to stock.";
+        }
+        dlg.showModal();
+      }
+
+      function renderSoldEditor() {
+        const wrap = document.getElementById("soldEditList");
+        const msg = document.getElementById("soldMsg");
+        if (!wrap) return;
+        const rows = state.sales.filter((s) => s.date === todayKey() && s.kind === "sale");
+        if (msg) msg.textContent = rows.length ? "Fix the quantity or price, or delete a row to return its units to stock." : "No sales recorded today yet.";
+        if (!rows.length) { wrap.innerHTML = '<div class="sold-empty">No sales recorded today yet.</div>'; return; }
+        wrap.innerHTML = rows.map((s) => `
+          <div class="sold-edit" data-id="${s.id}">
+            <div class="s-line"><b>${esc(s.name)}</b>${s.custom === true || isCustomSale(s) ? '<span class="s-tag">custom price</span>' : ""}<span class="hint" style="margin:0">${new Date(s.ts).toLocaleTimeString()}</span></div>
+            <div class="s-line">
+              <label>Qty <input type="number" min="1" step="1" class="s-qty" value="${s.qty}" /></label>
+              <label>Price <input type="number" min="0" step="0.01" class="s-price" value="${Number(s.price) || 0}" /></label>
+            </div>
+            <div class="s-actions">
+              <button class="btn" data-sact="save" data-id="${s.id}">Save</button>
+              <button class="btn ghost" data-sact="del" data-id="${s.id}">Delete (restock)</button>
+            </div>
+          </div>`).join("");
+      }
+
+      // Edit keeps stock as-is (it was already deducted) and only rewrites the record.
+      // Explicit qty/price args win; the dialog inputs are only read as a fallback.
+      function saveSalesEdit(id, qtyArg, priceArg) {
+        const s = state.sales.find((x) => x.id === id);
+        if (!s) return;
+        let qty = qtyArg, price = priceArg;
+        if (qty == null || price == null) {
+          const row = document.querySelector(`.sold-edit[data-id="${id}"]`);
+          if (row) {
+            if (qty == null) qty = Number((row.querySelector(".s-qty") || {}).value);
+            if (price == null) price = Number((row.querySelector(".s-price") || {}).value);
+          }
+        }
+        qty = Math.max(1, Math.round(Number(qty) || 1));
+        price = Math.max(0, Number(price) || 0);
+        s.qty = qty;
+        s.price = price;
+        s.custom = price !== listPriceOf(s);
+        saveAll();
+        renderSoldEditor();
+        renderSoldList();
+        render();
+        refreshReports();
+        toast(`Sale updated — ${qty} × ${s.name} at ${money(price)}`);
+      }
+
+      const listPriceOf = (s) => {
+        const it = s.itemId ? state.items.find((x) => x._id === s.itemId) : null;
+        return it ? (it.price ?? 0) : s.price;
+      };
+
+      // Deleting a wrong sale returns its units to stock (mis-click recovery).
+      function deleteSaleRow(id) {
+        const s = state.sales.find((x) => x.id === id);
+        if (!s) return;
+        const it = s.itemId ? state.items.find((x) => x._id === s.itemId) : null;
+        if (it) it.qty += s.qty;
+        state.sales = state.sales.filter((x) => x.id !== id);
+        saveAll();
+        if (cloudActive()) deleteFromCloud("sales", id);
+        renderSoldEditor();
+        renderSoldList();
+        render();
+        refreshReports();
+        if (it) maybeAlert(it);
+        toast(`Deleted sale — ${s.qty} × ${s.name} back in stock`);
+      }
+
+      $("editSaleBtn").addEventListener("click", () => openSold());
+      const soldCard = document.getElementById("statSoldCard");
+      if (soldCard) soldCard.addEventListener("click", () => openSold());
+      const editDlg = document.getElementById("editSaleDialog");
+      if (editDlg) {
+        editDlg.addEventListener("click", (e) => {
+          const btn = e.target.closest("button[data-sact]");
+          if (!btn) return;
+          if (btn.dataset.sact === "save") saveSalesEdit(btn.dataset.id);
+          if (btn.dataset.sact === "del") deleteSaleRow(btn.dataset.id);
+        });
+        $("soldClose").addEventListener("click", () => editDlg.close());
+      }
+
       // ================= Table actions =================
       tbody.addEventListener("click", (e) => {
         const btn = e.target.closest("button[data-act]");
@@ -1053,8 +1222,9 @@
         }
       });
 
+      // Manual +/- buttons are stock corrections, never sales: they change quantity only
+      // and must not touch the sales log. Use "sold …"/"custom sale …" to record real sales.
       function adjustQty(item, delta) {
-        if (delta < 0 && item.qty > 0) recordMovement(item, -delta, "sale");
         item.qty = Math.max(0, item.qty + delta);
         saveAll();
         render();
@@ -1069,8 +1239,9 @@
       }
 
       // priceOverride: per-sale custom price (chat "custom sale" command).
+      // "custom: true" marks the row so reports can list custom sales separately.
       function recordMovement(item, qty, kind, priceOverride) {
-        state.sales.push({ id: uid(), itemId: item._id, name: item.name, qty, price: priceOverride != null ? priceOverride : (item.price ?? 0), kind, date: todayKey(), ts: Date.now() });
+        state.sales.push({ id: uid(), itemId: item._id, name: item.name, qty, price: priceOverride != null ? priceOverride : (item.price ?? 0), kind, custom: priceOverride != null, date: todayKey(), ts: Date.now() });
       }
 
       // Fires one toast each time an item transitions into low/out this session.
@@ -1707,18 +1878,46 @@
       }
 
       function salesListReply(span) {
-        const top = topItems(salesIn(span).filter((s) => s.kind === "sale"));
-        if (!top.length) return `No sales ${span === "day" ? "today" : span === "yesterday" ? "yesterday" : "this " + span}.`;
+        const rows = salesIn(span).filter((s) => s.kind === "sale");
+        const breakdown = salesBreakdown(rows);
+        if (!breakdown.length) return `No sales ${span === "day" ? "today" : span === "yesterday" ? "yesterday" : "this " + span}.`;
         const lines = [`📊 Sales ${span === "day" ? "today" : span === "yesterday" ? "yesterday" : "this " + span}:`];
-        for (const [name, v] of top) lines.push(`   • ${name} — ${v.qty} sold (${money(v.revenue)})`);
-        const units = top.reduce((n, [, v]) => n + v.qty, 0);
-        const revenue = top.reduce((n, [, v]) => n + v.revenue, 0);
+        for (const [name, v] of breakdown) lines.push(`   • ${name} — ${v.qty} sold (${money(v.revenue)})`);
+        const units = breakdown.reduce((n, [, v]) => n + v.qty, 0);
+        const revenue = breakdown.reduce((n, [, v]) => n + v.revenue, 0);
         lines.push(`   Total: ${units} units · ${money(revenue)}`);
+        const customs = rows.filter((s) => isCustomSale(s));
+        if (customs.length) {
+          lines.push(`   Custom sales:`);
+          for (const s of customs) lines.push(`   • ${s.name} — ${s.qty} @ ${money(s.price)} each`);
+        }
         return lines.join("\n");
       }
 
       function reportReply(span) {
         return reportText(span);
+      }
+
+      // Group sale rows by item for the detailed report: name → qty, revenue, rows.
+      function salesBreakdown(sales) {
+        const byItem = new Map();
+        for (const s of sales) {
+          const cur = byItem.get(s.name) || { qty: 0, revenue: 0, rows: [] };
+          cur.qty += s.qty;
+          cur.revenue += s.qty * s.price;
+          cur.rows.push(s);
+          byItem.set(s.name, cur);
+        }
+        return [...byItem.entries()].sort((a, b) => b[1].qty - a[1].qty);
+      }
+
+      // A sale row is a custom sale when its price was overridden (flag on the row,
+      // or — for rows recorded before the flag existed — price differs from the list price).
+      function isCustomSale(s) {
+        if (!s || s.kind !== "sale") return false;
+        if (s.custom === true) return true;
+        const it = s.itemId ? state.items.find((x) => x._id === s.itemId) : null;
+        return !!(it && s.price != null && s.price !== (it.price ?? 0));
       }
 
       // Profit = revenue − (units sold × per-item cost). Items without a cost
@@ -1750,7 +1949,7 @@
       function takeStock(item, qty, kind, priceOverride) {
         if (item.qty < qty) return `⚠️ Only ${item.qty} of "${item.name}" in stock — can't remove ${qty}.`;
         item.qty -= qty;
-        recordMovement(item, qty, kind, priceOverride);
+        recordMovement(item, qty, kind, priceOverride); // custom flag set inside when priceOverride
         saveAll();
         maybeAlert(item);
         if (kind === "use") return `🏪 Taken for store use: ${qty} × "${item.name}" — ${item.qty} left. (Logged as store use, not a sale.)`;
@@ -1807,19 +2006,35 @@
         }
         const sales = rows.filter((s) => s.kind === "sale");
         const uses = rows.filter((s) => s.kind === "use");
-        const top = topItems(sales);
         const units = sales.reduce((n, s) => n + s.qty, 0);
         const revenue = sales.reduce((n, s) => n + s.qty * s.price, 0);
-        const lines = [`📊 ${label} — sales report:`, `   Sold: ${units} unit${units === 1 ? "" : "s"} · ${money(revenue)}`];
-        if (uses.length) {
-          const useQty = uses.reduce((n, s) => n + s.qty, 0);
-          lines.push(`   Store use: ${useQty} unit${useQty === 1 ? "" : "s"} (not sales)`);
-        }
-        if (top.length) {
-          lines.push("   Top items:");
-          for (const [name, v] of top.slice(0, 5)) lines.push(`   • ${name} — ${v.qty} sold (${money(v.revenue)})`);
+        const lines = [`📊 ${label} — detailed report:`, `   Sold: ${units} unit${units === 1 ? "" : "s"} · ${money(revenue)}`];
+
+        // Items sold: every item with its quantity and revenue (not just top 5).
+        const breakdown = salesBreakdown(sales);
+        if (breakdown.length) {
+          lines.push("   Items sold:");
+          for (const [name, v] of breakdown) lines.push(`   • ${name} — ${v.qty} sold (${money(v.revenue)})`);
         } else {
           lines.push("   No sales in this period.");
+        }
+
+        // Custom sales listed separately with the exact price of every row.
+        const customs = sales.filter((s) => isCustomSale(s));
+        if (customs.length) {
+          const cQty = customs.reduce((n, s) => n + s.qty, 0);
+          const cRev = customs.reduce((n, s) => n + s.qty * s.price, 0);
+          lines.push(`   Custom sales (separate): ${cQty} unit${cQty === 1 ? "" : "s"} · ${money(cRev)}`);
+          for (const s of customs) lines.push(`   • ${s.name} — ${s.qty} @ ${money(s.price)} each`);
+        }
+
+        // Store use: which items the shop itself consumed, with quantities.
+        if (uses.length) {
+          const useQty = uses.reduce((n, s) => n + s.qty, 0);
+          lines.push(`   Store use (not sales): ${useQty} unit${useQty === 1 ? "" : "s"}`);
+          const byUse = new Map();
+          for (const s of uses) byUse.set(s.name, (byUse.get(s.name) || 0) + s.qty);
+          for (const [name, q] of [...byUse.entries()].sort((a, b) => b[1] - a[1])) lines.push(`   • ${name} — ${q} used`);
         }
         return lines.join("\n");
       }
@@ -1848,6 +2063,7 @@
         if (from) from.value = todayKey(6);
         if (to) to.value = todayKey(0);
         renderReportPanel();
+        soldReply(); // Sold Today always reflects the active store only
       }
 
       function refreshReports() {
@@ -1883,7 +2099,7 @@
           run: (x, t) => profitReply(detectSpan(t)),
         },
         {
-          help: '• "report from 2026-09-01 to 2026-09-07" — sales for any date range',
+          help: '• "report from 2026-09-01 to 2026-09-07" — detailed sales for any date range',
           match: (x, t) => t.match(/report\s+from\s+(\S+)\s+to\s+(\S+)/),
           run: (m) => reportText("custom", m[1], m[2]),
         },
@@ -1893,7 +2109,7 @@
           run: (x, t) => reportReply(detectSpan(t)),
         },
         {
-          help: '• "what sold today?" / "top items this week"',
+          help: '• "what sold today?" / "top items this week" — or click Sold Today to edit sales',
           match: (x, t) =>
             ((t.startsWith("what") || t.startsWith("which")) && t.includes("sold")) ||
             t.startsWith("sales") || t.startsWith("sold items") ||

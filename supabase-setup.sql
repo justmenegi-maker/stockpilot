@@ -46,6 +46,7 @@ create index if not exists sales_ts_idx      on public.sales(ts);
 
 -- For projects set up before these columns existed (safe to re-run):
 alter table public.sales add column if not exists date date;
+alter table public.sales add column if not exists custom boolean not null default false; -- per-sale custom price (chat "custom sale")
 alter table public.items add column if not exists cost numeric not null default 0;
 
 -- Row Level Security: a signed-in user can only ever touch their own rows.

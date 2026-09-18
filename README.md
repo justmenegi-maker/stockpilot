@@ -11,10 +11,11 @@ Open `index.html` in any browser — that's it. No build, no install, no server 
 ## Features
 
 - **Inventory table** — add / edit / delete items with description, ±1 quick adjust, search, filter, sort
-- **Stats dashboard** — total items, units in stock, stock value, low/out count, units sold today
+- **Stats dashboard** — total items, units in stock, stock value, low/out count, units sold today, store-use units today
+- **Sold Today with edit & delete** — every sale and store-use of today is listed under the stats, tagged with custom prices. Click **✏️ Edit sales** (or the Sold Today card) to fix a mis-clicked quantity or price, or **Delete (restock)** a row to return its units to stock — reports update instantly
 - **Currency selector** — INR, USD, EUR, PKR, and more; persisted, applies everywhere instantly
-- **Sales log** — every sale (chat "sold", −1 button) and store-use (chat "used … for store") is recorded with date & price
-- **Reports** — daily / weekly (7d) / monthly (30d) plus custom date ranges: units sold, revenue, store-use units, top items
+- **Sales log** — every sale (chat "sold") and store-use (chat "store use …" / "used … for store") is recorded with date & price. The ±1 adjust buttons are stock corrections only — they never touch the sales log
+- **Detailed reports** — daily / weekly (7d) / monthly (30d) plus custom date ranges. Every report shows: each item sold with its quantity and revenue, **custom sales listed separately with the exact price of every row**, and **store use by item name** (what the shop itself consumed, in what quantity)
 - **Low-stock alerts** — per-item alert threshold; toasts fire when stock transitions to low/out; bell badge in the header
 - **Chat assistant** (💬 button, or press `/`) — natural language commands:
 
@@ -25,7 +26,8 @@ Open `index.html` in any browser — that's it. No build, no install, no server 
 | `custom sale vivo y18 @ 1600` | Sells 1 unit at a custom price (list price ignored). Add a qty: `custom sale 2 vivo y18 @ 1600` |
 | `store use 2 pens` | Takes 2 from stock for shop/display use — logged as store use, NOT a sale |
 | `used 2 pens for store` | Takes stock for shop/display use — logged as store use, NOT a sale (alias: `store use 2 pens`) |
-| `daily report` / `weekly report` / `monthly report` | Units sold, revenue, store use, top items for the period |
+| `daily report` / `weekly report` / `monthly report` | **Detailed report**: every item sold (qty + revenue), custom sales separately with prices, store use by item name |
+| `report from 2026-09-01 to 2026-09-07` | Same detailed report for any custom date range |
 | `what sold today?` / `top items this week` / `sales` | Per-item sales list for the period |
 | `desc pens` | Shows an item's stock, price, category and description |
 | `set desc pens: counter display` | Sets the item's description |
