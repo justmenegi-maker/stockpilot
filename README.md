@@ -22,7 +22,9 @@ Open `index.html` in any browser — that's it. No build, no install, no server 
 |---|---|
 | `add 10 pens` | Creates "Pens" with 10 units (or adds 10 to existing) |
 | `sold 3 pens` | Removes 3 from stock, logs the sale, warns if it goes low/out |
-| `used 2 pens for store` | Takes stock for shop/display use — logged as store use, NOT a sale |
+| `custom sale vivo y18 @ 1600` | Sells 1 unit at a custom price (list price ignored). Add a qty: `custom sale 2 vivo y18 @ 1600` |
+| `store use 2 pens` | Takes 2 from stock for shop/display use — logged as store use, NOT a sale |
+| `used 2 pens for store` | Takes stock for shop/display use — logged as store use, NOT a sale (alias: `store use 2 pens`) |
 | `daily report` / `weekly report` / `monthly report` | Units sold, revenue, store use, top items for the period |
 | `what sold today?` / `top items this week` / `sales` | Per-item sales list for the period |
 | `desc pens` | Shows an item's stock, price, category and description |
