@@ -49,13 +49,15 @@ Open `index.html` in any browser — that's it. No build, no install, no server 
 - **Dark / light mode** — follows system preference, toggle in header
 - **Keyboard shortcuts** — `N` = add item, `/` = open assistant
 
-## Cloud setup (multi-store, login, cloud save) — ~10 minutes, once
+## Cloud setup (multi-store, login, cloud save) — ~2 minutes, once
 
-1. Create a free project at **[supabase.com](https://supabase.com)** (no credit card needed).
-2. In the Supabase dashboard open **SQL Editor → New query**, paste the whole contents of `supabase-setup.sql` (this folder) and click **Run**. This creates the tables with row-level security, so every account can only ever see its own data.
-3. In Supabase go to **Settings → API** and copy the **Project URL** and the **anon public key**.
-4. Open StockPilot — a sign-in screen appears. Paste the URL and key, click **Save cloud settings** (one time — they're remembered in this browser), then **Sign up** with your email and a password.
-5. During sign-up you name your first store. After that a **store dropdown** appears in the header — pick it to switch stores; every store keeps its own items, sales, reports, and currency.
+StockPilot is **pre-wired to its Supabase project** — the URL (`https://xfeeggctabymhgepyhmo.supabase.co`) and the publishable key are already in the app:
+
+1. In the Supabase dashboard open **SQL Editor → New query**, paste the whole contents of `supabase-setup.sql` (this folder) and click **Run**. This creates the tables with row-level security, so every account can only ever see its own data. *(One time — the app can't create tables itself.)*
+2. Open StockPilot and **Sign up** with your email and a password — no keys to paste.
+3. During sign-up you name your first store. After that a **store dropdown** appears in the header — pick it to switch stores; every store keeps its own items, sales, reports, and currency.
+
+To point StockPilot at a *different* Supabase project, run `supabase-setup.sql` there, then paste that project's URL and publishable/anon key in the sign-in screen and click **Save cloud settings** — explicit values always override the pre-wired ones.
 
 Notes:
 
