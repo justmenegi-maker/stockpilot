@@ -35,8 +35,10 @@ Open `index.html` in any browser — that's it. No build, no install, no server 
 | `how many pens do we have?` | Reports stock for one item |
 | `add item hammer, qty 20, price 9.5` | Creates item with details |
 | `delete pens` | Removes the item |
+| `clean old data` | Deletes sales older than 6 months (asks to confirm; also runs automatically daily) |
 | `help` | Full command list |
 
+- **Auto data cleanup** — sales records older than 6 months are deleted automatically (once a day, per browser) from the active store, other stores' local caches, and the cloud, keeping storage lean. Current stock and items are never touched. Also on demand via the chat: `clean old data`
 - **Persistence** — data saved in browser localStorage (per browser/profile), and to the cloud when signed in
 - **Multi-store** — 🏬 **Stores** opens an all-stores overview: one card per store with items, units, stock value, low/out alerts, units sold today, and today's revenue. Create and delete stores; each store has **its own page, stock, sales log, reports, currency, and its own assistant conversation** — so each store's chat keeps its own context.
 - **Cloud sync (optional)** — see **Cloud setup** below; offline stores carry over automatically on first sign-in
