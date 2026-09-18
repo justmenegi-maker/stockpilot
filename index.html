@@ -87,7 +87,7 @@
       [data-theme="dark"] .alert-badge { background: #450a0a; border-color: #7f1d1d; }
       .alert-badge:hover { filter: brightness(1.05); }
       main { max-width: 1150px; margin: 0 auto; padding: clamp(12px, 3vw, 24px); padding-bottom: 96px; }
-      .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 16px; }
+      .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 16px; }
       @media (max-width: 760px) { .stats { grid-template-columns: repeat(2, 1fr); } }
       .stat {
         background: var(--panel);
@@ -126,7 +126,6 @@
       }
       .sold-edit input:focus { border-color: var(--brand); }
       .sold-edit .s-actions { display: flex; gap: 8px; margin-top: 2px; }
-      .rp-report { white-space: pre-wrap; }
       .value.ok { color: var(--ok); }
       .value.danger { color: var(--danger); }
       .toolbar { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
@@ -1107,8 +1106,9 @@
         if (!rows.length) { el.innerHTML = '<div class="sold-empty">No sales or store use today yet.</div>'; return; }
         el.innerHTML = rows.map((s) => {
           const tag = s.kind === "use" ? '<span class="s-tag">store use</span>' : s.custom === true || isCustomSale(s) ? '<span class="s-tag">custom price</span>' : "";
+          // Store use consumes stock at no revenue, so showing a per-unit price would be misleading.
           const priceNote = s.kind === "use" ? "" : ` · ${money(s.qty * s.price)}`;
-          return `<div class="sold-row"><span class="s-name">${esc(s.name)}</span><span>× ${s.qty}</span><span class="s-price">${money(s.price)} each${priceNote}</span>${tag}</div>`;
+          return `<div class="sold-row"><span class="s-name">${esc(s.name)}</span><span>× ${s.qty}</span>${s.kind === "use" ? "" : `<span class="s-price">${money(s.price)} each${priceNote}</span>`}${tag}</div>`;
         }).join("");
       }
 
