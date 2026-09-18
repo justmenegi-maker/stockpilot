@@ -617,9 +617,9 @@
         <h2 id="authTitle">☁️ Sign in to StockPilot</h2>
         <p class="sub" id="authSub">One account, all your stores — data saved in the cloud.</p>
         <div id="cfgFields">
-          <div class="field"><label>Supabase project URL</label><input id="cfgUrl" placeholder="https://xxxx.supabase.co" /></div>
-          <div class="field"><label>Supabase anon key (public)</label><textarea id="cfgKey" rows="3" placeholder="eyJ…"></textarea></div>
-          <p class="note">First time? Create a free project at <b>supabase.com</b>, run <b>supabase-setup.sql</b> (from this folder) in its SQL Editor, then paste the URL + anon key here. Both are in your project's Settings → API.</p>
+          <div class="field"><label>Supabase project URL</label><input id="cfgUrl" placeholder="https://xfeeggctabymhgepyhmo.supabase.co" /></div>
+          <div class="field"><label>Supabase key (publishable/anon)</label><textarea id="cfgKey" rows="3" placeholder="Pre-wired — paste here only to override"></textarea></div>
+          <p class="note">Cloud is pre-wired to this app's Supabase project (URL + key). Just <b>Sign up</b> below. To use a different project, run <b>supabase-setup.sql</b> there and paste its URL + key, then <b>Save cloud settings</b>.</p>
         </div>
         <div id="authFields">
           <div class="field"><label>Email</label><input id="authEmail" type="email" placeholder="you@example.com" /></div>
@@ -653,12 +653,14 @@
       // touches the cloud layer directly.
 
       // ================= Cloud (Supabase) =================
-      // Setup: free project at supabase.com, run supabase-setup.sql in its SQL Editor,
-      // paste the project URL + anon key. Without them the app runs offline-only.
+      // Setup: run supabase-setup.sql in the project's SQL Editor, then paste the
+      // anon key in the sign-in screen (URL below is pre-wired; override anytime).
       const CFG_KEY = "stockpilot.cloud.cfg";
+      const DEFAULT_SB_URL = "https://xfeeggctabymhgepyhmo.supabase.co"; // project pre-wired
+      const DEFAULT_SB_KEY = "sb_publishable_Jwsb72Ltvu6WMIzr7hBJqw_YlcSaCZx"; // publishable key (safe in client code)
       const CFG = loadCFG();
-      const SB_URL = (CFG.url || "").trim();
-      const SB_KEY = (CFG.key || "").trim();
+      const SB_URL = ((CFG.url || "").trim() || DEFAULT_SB_URL);
+      const SB_KEY = ((CFG.key || "").trim() || DEFAULT_SB_KEY);
       let sb = SB_URL && SB_KEY && window.supabase ? window.supabase.createClient(SB_URL, SB_KEY) : null;
       let cloudUser = null;      // signed-in user
       let cloudStores = [];      // rows of public.stores for this user
@@ -669,10 +671,10 @@
 
       // Validate config fields and build a client from what the user just pasted.
       function makeClient() {
-        const url = $("cfgUrl").value.trim();
-        const key = $("cfgKey").value.trim();
+        const url = ($("cfgUrl").value.trim() || DEFAULT_SB_URL); // empty field = pre-wired project
+        const key = ($("cfgKey").value.trim() || DEFAULT_SB_KEY); // empty field = pre-wired key
         if (!/^https:\/\/.+\.supabase\.co\/?$/.test(url)) return { error: "URL should look like https://xxxxx.supabase.co" };
-        if (key.length < 30) return { error: "Paste the anon/public key from Settings → API." };
+        if (key.length < 30) return { error: "Paste the publishable/anon key from Settings → API." };
         if (!window.supabase) return { error: "Supabase library failed to load — check your connection and reload." };
         return { client: window.supabase.createClient(url, key) };
       }
@@ -1280,7 +1282,7 @@
 
       function showAuth(prefillCfg) {
         authBackdrop.style.display = "flex";
-        if (prefillCfg) { $("cfgUrl").value = CFG.url || ""; $("cfgKey").value = CFG.key || ""; }
+        if (prefillCfg) { $("cfgUrl").value = CFG.url || ""; $("cfgUrl").placeholder = DEFAULT_SB_URL; $("cfgKey").value = CFG.key || ""; $("cfgKey").placeholder = "Pre-wired — paste here only to override"; }
         setAuthMode(authMode);
       }
       function hideAuth() { authBackdrop.style.display = "none"; }
