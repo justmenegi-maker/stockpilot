@@ -376,20 +376,80 @@
         display: flex; align-items: center; justify-content: center; padding: 16px;
       }
       .auth-card {
-        width: 100%; max-width: 360px; background: var(--card); border: 1px solid var(--border);
-        border-radius: 14px; padding: 22px; box-shadow: var(--shadow);
+        width: 100%; max-width: 400px; background: var(--panel); border: 1px solid var(--line);
+        border-radius: 20px; padding: 26px 24px 18px; box-shadow: 0 24px 64px rgba(2, 6, 23, 0.28);
+        animation: pop 0.18s ease-out;
       }
-      .auth-card h2 { margin: 0 0 4px; font-size: 18px; }
-      .auth-card .sub { color: var(--muted); font-size: 12.5px; margin: 0 0 14px; }
+      .auth-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+      .auth-brand .logo-box { width: 38px; height: 38px; border-radius: 11px; font-size: 19px; }
+      .auth-brand h2 { margin: 0; font-size: 18px; letter-spacing: -0.02em; }
+      .auth-brand .sub { margin: 2px 0 0; color: var(--muted); font-size: 12.5px; }
+      .auth-tabs, .acct-tabs {
+        display: flex; gap: 4px;
+        background: color-mix(in srgb, var(--panel) 55%, var(--bg));
+        border: 1px solid var(--line); border-radius: 12px; padding: 4px; margin-bottom: 16px;
+      }
+      .auth-tabs button, .acct-tabs button {
+        flex: 1; border: none; background: transparent; color: var(--muted); font: inherit;
+        font-size: 13.5px; font-weight: 700; padding: 8px 10px; border-radius: 9px; cursor: pointer;
+        white-space: nowrap;
+      }
+      .auth-tabs button.active, .acct-tabs button.active {
+        background: var(--panel); color: var(--ink); box-shadow: 0 1px 4px rgba(2, 6, 23, 0.12);
+      }
       .auth-card .field { margin-bottom: 10px; text-align: left; }
       .auth-card .field label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; }
       .auth-card .field input, .auth-card .field textarea {
-        width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border);
-        border-radius: 8px; padding: 9px 10px; font: inherit;
+        width: 100%; background: var(--bg); color: var(--ink); border: 1px solid var(--line);
+        border-radius: 10px; padding: 10px 12px; font: inherit; outline: none;
       }
-      .auth-card .err { color: #e5484d; font-size: 12.5px; margin: 6px 0 0; white-space: pre-wrap; }
-      .auth-card .note { color: var(--muted); font-size: 12px; margin-top: 12px; line-height: 1.45; }
-      .auth-note { font-size: 11.5px; color: var(--muted); margin-left: 6px; }
+      .auth-card .field input:focus, .auth-card .field textarea:focus { border-color: var(--brand); }
+      .pass-wrap { position: relative; }
+      .pass-wrap input { padding-right: 44px; }
+      .pass-eye {
+        position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+        border: none; background: transparent; color: var(--muted); cursor: pointer;
+        font-size: 15px; padding: 6px; border-radius: 8px; line-height: 1;
+      }
+      .pass-eye:hover { color: var(--brand); }
+      .auth-card .btn { width: 100%; justify-content: center; }
+      .auth-submit { margin-top: 4px; padding: 11px 14px; font-size: 14.5px; border-radius: 12px; }
+      .auth-links { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; gap: 8px; flex-wrap: wrap; }
+      .auth-links .btn { width: auto; font-size: 13px; padding: 8px 10px; }
+      .err { color: var(--danger); font-size: 12.5px; margin: 8px 0 0; white-space: pre-wrap; text-align: left; }
+      .sb-adv { border-top: 1px dashed var(--line); margin-top: 16px; padding-top: 12px; }
+      .sb-adv > button {
+        width: 100%; border: none; background: transparent; color: var(--muted); font: inherit;
+        font-size: 12.5px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 6px; padding: 2px 0;
+      }
+      .sb-adv > button:hover { color: var(--brand); }
+      .sb-adv .arrow { transition: transform 0.15s; }
+      .sb-adv.open .arrow { transform: rotate(90deg); }
+      .sb-adv-body { display: none; margin-top: 10px; }
+      .sb-adv.open .sb-adv-body { display: block; }
+      .sb-adv-body .field textarea { font-size: 12px; }
+      .conn-line { display: flex; align-items: center; gap: 8px; margin: 8px 0 4px; flex-wrap: wrap; }
+      .conn-line .btn { width: auto; padding: 7px 12px; font-size: 12.5px; border-radius: 10px; }
+      #authProjHint, .proj-hint { color: var(--muted); font-size: 11.5px; }
+      #authProjHint { margin: -4px 0 12px; }
+      /* Account dialog */
+      dialog#accountDialog { width: min(470px, calc(100vw - 24px)); }
+      .conn-status {
+        font-size: 12.5px; padding: 9px 11px; border-radius: 10px; border: 1px solid var(--line);
+        background: color-mix(in srgb, var(--panel) 55%, var(--bg)); color: var(--muted);
+        line-height: 1.45; margin-bottom: 10px;
+      }
+      .conn-status.good { border-color: color-mix(in srgb, var(--ok) 45%, var(--line)); color: var(--ok); }
+      .conn-status.warn { border-color: color-mix(in srgb, var(--warn) 45%, var(--line)); color: var(--warn); }
+      .conn-status.bad { border-color: color-mix(in srgb, var(--danger) 45%, var(--line)); color: var(--danger); }
+      #acctCloudTables { display: none; margin: 0 0 10px; font-size: 12px; color: var(--muted); white-space: pre-wrap; }
+      .danger-zone {
+        border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--line));
+        border-radius: 12px; padding: 12px; margin-top: 16px;
+      }
+      .danger-zone h4 { margin: 0 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--danger); }
+      .danger-zone p { margin: 0 0 10px; font-size: 12px; color: var(--muted); }
+      .danger-zone .btn { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, var(--line)); }
 
       /* ================= Multi-store overview ================= */
       .overview-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 4px 0 14px; flex-wrap: wrap; }
@@ -457,6 +517,7 @@
       <div class="spacer"></div>
       <div class="header-actions">
         <button class="btn ghost" id="signinBtn" title="Sign in / cloud settings">☁️ Sign in</button>
+        <button class="btn ghost" id="accountBtn" title="Account settings" style="display:none">👤 Account</button>
         <button class="btn ghost" id="storesBtn" title="All stores overview">🏬 Stores</button>
         <select id="storeSelect" aria-label="Store" title="Store" style="display:none"></select>
         <button class="btn ghost" id="addStoreBtn" title="Add another store" style="display:none">＋ Store</button>
@@ -614,29 +675,101 @@
 
     <div id="authBackdrop" style="display:none">
       <div class="auth-card">
-        <h2 id="authTitle">☁️ Sign in to StockPilot</h2>
-        <p class="sub" id="authSub">One account, all your stores — data saved in the cloud.</p>
-        <div id="cfgFields">
-          <div class="field"><label>Supabase project URL</label><input id="cfgUrl" placeholder="https://xfeeggctabymhgepyhmo.supabase.co" /></div>
-          <div class="field"><label>Supabase key (publishable/anon)</label><textarea id="cfgKey" rows="3" placeholder="Pre-wired — paste here only to override"></textarea></div>
-          <p class="note">Cloud is pre-wired to this app's Supabase project (URL + key). Just <b>Sign up</b> below. To use a different project, run <b>supabase-setup.sql</b> there and paste its URL + key, then <b>Save cloud settings</b>.</p>
+        <div class="auth-brand">
+          <div class="logo-box">📦</div>
+          <div>
+            <h2 id="authTitle">☁️ Sign in to StockPilot</h2>
+            <p class="sub" id="authSub">One account, all your stores — synced in the cloud.</p>
+          </div>
+        </div>
+        <div class="auth-tabs" id="authTabs">
+          <button type="button" data-mode="signin" class="active">Sign in</button>
+          <button type="button" data-mode="signup">Create account</button>
         </div>
         <div id="authFields">
-          <div class="field"><label>Email</label><input id="authEmail" type="email" placeholder="you@example.com" /></div>
-          <div class="field"><label>Password</label><input id="authPass" type="password" placeholder="••••••••" /></div>
+          <div class="field"><label>Email</label><input id="authEmail" type="email" placeholder="you@example.com" autocomplete="email" /></div>
+          <div class="field"><label>Password</label>
+            <div class="pass-wrap">
+              <input id="authPass" type="password" placeholder="••••••••" autocomplete="current-password" />
+              <button type="button" class="pass-eye" id="passEye" title="Show / hide password">👁️</button>
+            </div>
+          </div>
           <div class="field" id="storeNameField"><label>First store name (you can add more later)</label><input id="storeName" placeholder="e.g. Main Shop" /></div>
         </div>
         <p class="err" id="authErr" style="display:none"></p>
-        <div class="dialog-actions">
-          <button class="btn" id="cfgSave">Save cloud settings</button>
-          <button class="btn primary" id="authSubmit">Sign in</button>
-        </div>
-        <div class="dialog-actions">
-          <button class="btn ghost" id="authToggle">Need an account? Sign up</button>
+        <button class="btn primary auth-submit" id="authSubmit">Sign in</button>
+        <div class="auth-links">
           <button class="btn ghost" id="offlineBtn">Continue without cloud</button>
+          <button class="btn ghost" id="authToggle">Create account</button>
+        </div>
+        <div class="sb-adv" id="sbAdv">
+          <button type="button" id="sbAdvToggle"><span class="arrow">▸</span> Supabase connection (advanced)</button>
+          <div class="sb-adv-body" id="sbAdvBody">
+            <div class="field"><label>Supabase project URL</label><input id="cfgUrl" placeholder="https://xfeeggctabymhgepyhmo.supabase.co" /></div>
+            <div class="field"><label>Supabase key (publishable/anon)</label><textarea id="cfgKey" rows="3" placeholder="Pre-wired — paste here only to override"></textarea></div>
+            <div class="conn-line">
+              <button class="btn" id="cfgSave">Save cloud settings</button>
+              <button class="btn" id="cfgTest">Test connection</button>
+            </div>
+            <p class="proj-hint" id="authProjHint" style="display:none"></p>
+            <p class="note">Pre-wired to this app's Supabase project. To use a different one, run <b>supabase-setup.sql</b> there, paste its URL + key, then <b>Save cloud settings</b>.</p>
+          </div>
         </div>
       </div>
     </div>
+
+    <!-- Account settings: profile details + Supabase connection management. -->
+    <dialog id="accountDialog">
+      <div class="dialog-body">
+        <h3 id="acctTitle">👤 Account settings</h3>
+        <p id="acctSub" class="hint" style="margin:0 0 12px"></p>
+        <div class="acct-tabs">
+          <button type="button" data-tab="profile" class="active">Profile</button>
+          <button type="button" data-tab="cloud">☁️ Supabase</button>
+          <button type="button" data-tab="danger">Danger zone</button>
+        </div>
+
+        <div id="acctProfile">
+          <div class="field"><label>Display name (stored on your account)</label><input id="acctName" placeholder="e.g. Store Owner" maxlength="60" /></div>
+          <div class="field"><label>Email (sign-in address)</label><input id="acctEmail" type="email" disabled /></div>
+          <p class="hint" style="margin:0 0 10px">Password changes and email changes go through Supabase and apply on your next sign-in. Changing your password here keeps you signed in.</p>
+          <div class="field"><label>Current password (needed to set a new one)</label><input id="acctCurPass" type="password" autocomplete="current-password" /></div>
+          <div class="field"><label>New password (leave blank to keep current)</label><div class="pass-wrap"><input id="acctNewPass" type="password" autocomplete="new-password" placeholder="at least 6 characters" /><button type="button" class="pass-eye acct-eye" title="Show / hide password">👁️</button></div></div>
+          <p class="err" id="acctErr" style="display:none"></p>
+          <div class="dialog-actions">
+            <span class="proj-hint" id="acctSaved" style="margin-right:auto; display:none">✅ Saved</span>
+            <button class="btn" id="acctRefresh">Reset</button>
+            <button class="btn primary" id="acctSaveProfile">Save changes</button>
+          </div>
+        </div>
+
+        <div id="acctCloud" style="display:none">
+          <div class="conn-status" id="acctConnStatus">Checking connection…</div>
+          <div class="field"><label>Supabase project URL</label><input id="acctCfgUrl" placeholder="https://xxxxx.supabase.co" /></div>
+          <div class="field"><label>Supabase key (publishable/anon)</label><textarea id="acctCfgKey" rows="3" placeholder="Pre-wired — paste here only to override"></textarea></div>
+          <div class="conn-line">
+            <button class="btn" id="acctCfgSave">Save & reconnect</button>
+            <button class="btn" id="acctCfgTest">Test connection</button>
+            <button class="btn" id="acctCfgReset">Use default project</button>
+          </div>
+          <p class="proj-hint" id="acctProjHint" style="display:none"></p>
+          <p class="hint" style="margin:6px 0 0">Default project is pre-wired in the app. A custom connection applies immediately after saving — tables must exist there (run <b>supabase-setup.sql</b> in its SQL Editor).</p>
+        </div>
+
+        <div id="acctDanger" style="display:none">
+          <div class="danger-zone">
+            <h4>Sign out on this device</h4>
+            <p>You stay registered; data stays in the cloud and on this browser's cache.</p>
+            <button class="btn" id="acctSignOut">Log out</button>
+          </div>
+          <div class="danger-zone">
+            <h4>Delete account</h4>
+            <p>Permanently deletes your Supabase auth user. Stores, items, sales and chats are removed by cascading deletes (when the project was created with the bundled SQL).</p>
+            <button class="btn" id="acctDelete">Delete my account</button>
+          </div>
+        </div>
+      </div>
+    </dialog>
 
     <div id="toastWrap"></div>
 
@@ -658,9 +791,9 @@
       const CFG_KEY = "stockpilot.cloud.cfg";
       const DEFAULT_SB_URL = "https://xfeeggctabymhgepyhmo.supabase.co"; // project pre-wired
       const DEFAULT_SB_KEY = "sb_publishable_Jwsb72Ltvu6WMIzr7hBJqw_YlcSaCZx"; // publishable key (safe in client code)
-      const CFG = loadCFG();
-      const SB_URL = ((CFG.url || "").trim() || DEFAULT_SB_URL);
-      const SB_KEY = ((CFG.key || "").trim() || DEFAULT_SB_KEY);
+      let CFG = loadCFG();
+      let SB_URL = ((CFG.url || "").trim() || DEFAULT_SB_URL);
+      let SB_KEY = ((CFG.key || "").trim() || DEFAULT_SB_KEY);
       let sb = SB_URL && SB_KEY && window.supabase ? window.supabase.createClient(SB_URL, SB_KEY) : null;
       let cloudUser = null;      // signed-in user
       let cloudStores = [];      // rows of public.stores for this user
@@ -1295,6 +1428,71 @@
         $("storeNameField").classList.toggle("hidden", mode !== "signup");
         authErr.style.display = "none";
       }
+      // Auth tabs + password visibility toggle.
+      for (const b of $("authTabs").querySelectorAll("button[data-mode]")) {
+        b.addEventListener("click", () => setAuthMode(b.dataset.mode));
+      }
+      $("passEye").addEventListener("click", () => {
+        const inp = $("authPass");
+        const show = inp.type === "password";
+        inp.type = show ? "text" : "password";
+        $("passEye").textContent = show ? "🙈" : "👁️";
+      });
+      // Collapsible advanced Supabase panel on the login card.
+      $("sbAdvToggle").addEventListener("click", () => $("sbAdv").classList.toggle("open"));
+
+      // Friendly, actionable error text for common Supabase auth failures.
+      function friendlyAuthError(e) {
+        const m = (e && e.message) || String(e || "");
+        const map = [
+          [/invalid login credentials/i, "Email or password is incorrect. Try again, or create a new account below."],
+          [/email not confirmed/i, "Your email isn't confirmed yet — check your inbox for the confirmation link, then sign in."],
+          [/rate.?limit|over_email_send/i, "Too many attempts — please wait a minute and try again."],
+          [/user already (registered|exists)/i, "An account with this email already exists — sign in instead."],
+          [/password should be at least/i, "Password must be at least 6 characters."],
+          [/unable to validate email/i, "That doesn't look like a valid email address."],
+          [/failed to fetch|networkerror|load failed/i, "Can't reach the server — check your internet connection."],
+        ];
+        for (const [re, msg] of map) if (re.test(m)) return msg;
+        return m;
+      }
+
+      // Supabase connection test: reachable, auth service OK, and required tables present.
+      async function testCloudConnection(client, url) {
+        const tables = ["stores", "items", "sales", "chats"];
+        const out = { ok: false, summary: "", tables: "" };
+        let head = "";
+        try {
+          const u = new URL(url);
+          head = "REACHABLE_OK " + u.hostname;
+        } catch {
+          out.summary = "INVALID_URL";
+          return out;
+        }
+        try {
+          const { error } = await client.auth.getSession();
+          if (error) throw error;
+          out.tables += "\nAUTH_OK";
+        } catch (e) {
+          out.summary = head + "\nAUTH_FAIL " + e.message;
+          return out;
+        }
+        const results = await Promise.all(tables.map(async (t) => {
+          try {
+            const { error } = await client.from(t).select("id").limit(1);
+            return { t, ok: !error, msg: error ? error.message : "" };
+          } catch (e) { return { t, ok: false, msg: e.message }; }
+        }));
+        const missing = results.filter((r) => !r.ok);
+        out.tables += "\n" + results.map((r) => (r.ok ? "TABLE " + r.t + ": OK" : "TABLE " + r.t + ": MISSING (" + r.msg.slice(0, 60) + ")")).join("\n");
+        if (missing.length) {
+          out.summary = head + out.tables + "\nRUN_SETUP_SQL";
+          return out;
+        }
+        out.ok = true;
+        out.summary = head + out.tables + "\nALL_GOOD";
+        return out;
+      }
 
       // Header buttons depend on cloud sign-in state; the store dropdown works in
       // both modes (offline stores are listed too). Inline display wins over the
@@ -1551,6 +1749,7 @@
         applySessionUI();
         applyActiveStore();
         runAutoPrune(); // prune sales older than 6 months (state + local caches + cloud)
+        $("acctTitle").textContent = user && user.email ? "Account — " + user.email : "Account settings";
         toast(`☁️ Signed in — ${cloudStores.length} store${cloudStores.length === 1 ? "" : "s"} loaded`, 3200);
       }
 
@@ -1569,7 +1768,20 @@
         if (error) return authFail(error);
         localStorage.setItem(CFG_KEY, JSON.stringify({ url: $("cfgUrl").value.trim(), key: $("cfgKey").value.trim() }));
         sb = client;
+        $("authProjHint").style.display = "none";
         toast("Cloud settings saved — you're ready to sign in");
+      });
+      $("cfgTest").addEventListener("click", async () => {
+        const url = ($("cfgUrl").value.trim() || DEFAULT_SB_URL);
+        const key = ($("cfgKey").value.trim() || DEFAULT_SB_KEY);
+        const hint = $("authProjHint");
+        hint.style.display = "block";
+        hint.textContent = "⏳ Testing connection…";
+        if (!/^https:\/\/.+\.supabase\.co\/?$/.test(url)) { hint.textContent = "❌ URL should look like https://xxxxx.supabase.co"; return; }
+        if (key.length < 30) { hint.textContent = "❌ Paste the publishable/anon key from Settings → API."; return; }
+        const probe = window.supabase.createClient(url, key);
+        const res = await testCloudConnection(probe, url);
+        hint.textContent = res.summary;
       });
       $("offlineBtn").addEventListener("click", () => {
         hideAuth();
@@ -1637,6 +1849,7 @@
         if (!email || !pass) return authFail("Enter your email and password.");
         const btn = $("authSubmit");
         btn.disabled = true;
+        btn.textContent = "Please wait…";
         try {
           if (authMode === "signup") {
             const storeName = $("storeName").value.trim() || "My Store";
@@ -1650,11 +1863,193 @@
             await afterSignIn(data.user, null);
           }
         } catch (e) {
-          authFail(e.message || "Sign-in failed");
+          authFail(friendlyAuthError(e));
+        } finally {
+          btn.disabled = false;
+          btn.textContent = authMode === "signup" ? "Create account" : "Sign in";
+        }
+      });
+
+      // ================= Account settings =================
+      // Profile tab: edit the account's display name (auth.users.raw_user_meta_data)
+      // and password (sb.auth.updateUser). Cloud tab: switch or test the Supabase
+      // project this app talks to. Danger tab: sign out / delete the account.
+      const acctDlg = $("accountDialog");
+      const acctErr = $("acctErr");
+      const acctEye = document.querySelector(".acct-eye");
+      if (acctEye) acctEye.addEventListener("click", () => {
+        const inp = $("acctNewPass");
+        const show = inp.type === "password";
+        inp.type = show ? "text" : "password";
+        acctEye.textContent = show ? "🙈" : "👁️";
+      });
+      for (const b of acctDlg.querySelectorAll(".acct-tabs button[data-tab]")) {
+        b.addEventListener("click", () => {
+          const tab = b.dataset.tab;
+          for (const x of acctDlg.querySelectorAll(".acct-tabs button[data-tab]")) x.classList.toggle("active", x === b);
+          $("acctProfile").style.display = tab === "profile" ? "" : "none";
+          $("acctCloud").style.display = tab === "cloud" ? "" : "none";
+          $("acctDanger").style.display = tab === "danger" ? "" : "none";
+          if (tab === "profile") acctFillProfile();
+          if (tab === "cloud") acctCheckConn();
+        });
+      }
+      function acctOpen() {
+        if (!signedIn()) { showAuth(true); return; }
+        acctDlg.showModal();
+        acctFillProfile();
+        acctFillCloud();
+      }
+      function acctClose() { if (acctDlg.open) acctDlg.close(); }
+      function acctFlash(msg) {
+        const el = $("acctSaved");
+        el.textContent = msg;
+        el.style.display = "block";
+        setTimeout(() => { el.style.display = "none"; }, 2200);
+      }
+      function acctFail(msg) { acctErr.textContent = msg; acctErr.style.display = "block"; }
+      function acctClearErr() { acctErr.style.display = "none"; }
+      function acctFillProfile() {
+        acctClearErr();
+        $("acctEmail").value = (cloudUser && cloudUser.email) || "";
+        $("acctName").value = (cloudUser && cloudUser.user_metadata && cloudUser.user_metadata.full_name) || "";
+        $("acctCurPass").value = "";
+        $("acctNewPass").value = "";
+      }
+      function acctFillCloud() {
+        $("acctCfgUrl").value = CFG.url || "";
+        $("acctCfgUrl").placeholder = DEFAULT_SB_URL;
+        $("acctCfgKey").value = CFG.key || "";
+        $("acctCfgKey").placeholder = "Pre-wired — paste here only to override";
+        $("acctProjHint").style.display = "none";
+      }
+      // Persist display name and/or new password via the signed-in client.
+      $("acctSaveProfile").addEventListener("click", async () => {
+        if (!signedIn()) return;
+        acctClearErr();
+        const name = $("acctName").value.trim();
+        const cur = $("acctCurPass").value;
+        const next = $("acctNewPass").value;
+        const updates = {};
+        if (name !== ((cloudUser.user_metadata || {}).full_name || "")) updates.data = { full_name: name };
+        if (next) {
+          if (next.length < 6) return acctFail("New password must be at least 6 characters.");
+          if (!cur) return acctFail("Enter your current password to set a new one.");
+          // Re-authenticate first so the update is allowed even after long sessions.
+          const { error: eV } = await sb.auth.signInWithPassword({ email: cloudUser.email, password: cur });
+          if (eV) return acctFail(friendlyAuthError(eV));
+          updates.password = next;
+        }
+        if (!Object.keys(updates).length) { acctFlash("Nothing to change"); return; }
+        const btn = $("acctSaveProfile");
+        btn.disabled = true;
+        try {
+          const { data, error } = await sb.auth.updateUser(updates);
+          if (error) throw error;
+          cloudUser = data.user || cloudUser;
+          acctFillProfile();
+          acctFlash("✅ Saved");
+          toast("👤 Account updated");
+        } catch (e) {
+          acctFail(friendlyAuthError(e));
         } finally {
           btn.disabled = false;
         }
       });
+      $("acctRefresh").addEventListener("click", () => { acctFillProfile(); $("acctSaved").style.display = "none"; });
+
+      // Cloud tab: reflect the active connection and let the user test or change it.
+      async function acctCheckConn() {
+        const el = $("acctConnStatus");
+        el.className = "conn-status";
+        el.textContent = "⏳ Checking connection…";
+        const res = await testCloudConnection(sb, SB_URL);
+        el.className = "conn-status " + (res.ok ? "good" : "bad");
+        el.textContent = res.ok ? res.summary.replace("🎉 Everything looks good — ready to sign in.", "✅ Connected — all required tables are present.") : res.summary;
+      }
+      $("acctCfgTest").addEventListener("click", async () => {
+        const url = ($("acctCfgUrl").value.trim() || DEFAULT_SB_URL);
+        const key = ($("acctCfgKey").value.trim() || DEFAULT_SB_KEY);
+        const el = $("acctConnStatus");
+        el.className = "conn-status";
+        el.textContent = "⏳ Testing…";
+        if (!/^https:\/\/.+\.supabase\.co\/?$/.test(url)) {
+          el.className = "conn-status bad";
+          el.textContent = "❌ URL should look like https://xxxxx.supabase.co";
+          return;
+        }
+        if (key.length < 30) {
+          el.className = "conn-status bad";
+          el.textContent = "❌ Paste the publishable/anon key from Settings → API.";
+          return;
+        }
+        const probe = window.supabase.createClient(url, key);
+        const res = await testCloudConnection(probe, url);
+        el.className = "conn-status " + (res.ok ? "good" : "bad");
+        el.textContent = res.summary;
+      });
+      $("acctCfgSave").addEventListener("click", async () => {
+        const url = ($("acctCfgUrl").value.trim() || DEFAULT_SB_URL);
+        const key = ($("acctCfgKey").value.trim() || DEFAULT_SB_KEY);
+        if (!/^https:\/\/.+\.supabase\.co\/?$/.test(url)) return acctFail("URL should look like https://xxxxx.supabase.co");
+        if (key.length < 30) { acctFail("Paste the publishable/anon key from Settings → API."); return; }
+        const btn = $("acctCfgSave");
+        btn.disabled = true;
+        try {
+          const probe = window.supabase.createClient(url, key);
+          const res = await testCloudConnection(probe, url);
+          if (!res.ok) throw new Error(res.summary);
+          localStorage.setItem(CFG_KEY, JSON.stringify({ url, key }));
+          CFG = loadCFG();
+          SB_URL = url; SB_KEY = key;
+          sb = probe;
+          // Refresh identity against the (possibly new) project.
+          const { data } = await sb.auth.getSession();
+          if (data && data.session) { await afterSignIn(data.session.user, null); }
+          else { acctClose(); await signOut(); }
+          acctFillCloud();
+          acctCheckConn();
+          toast("☁️ Supabase connection updated");
+        } catch (e) {
+          $("acctConnStatus").className = "conn-status bad";
+          $("acctConnStatus").textContent = String(e.message || e).slice(0, 400);
+        } finally {
+          btn.disabled = false;
+        }
+      });
+      $("acctCfgReset").addEventListener("click", () => {
+        $("acctCfgUrl").value = "";
+        $("acctCfgKey").value = "";
+        acctFillCloud();
+        acctFlash("Fields reset to the pre-wired project");
+      });
+
+      // Danger tab.
+      $("acctSignOut").addEventListener("click", async () => {
+        acctClose();
+        await signOut();
+      });
+      $("acctDelete").addEventListener("click", async () => {
+        if (!confirm("Delete your account permanently? All stores, items, sales and chats are removed. This cannot be undone.")) return;
+        acctClose();
+        try {
+          const res = await fetch(`${SB_URL}/auth/v1/user`, {
+            method: "DELETE",
+            headers: { apikey: SB_KEY, Authorization: `Bearer ${cloudUser && cloudUser.access_token ? cloudUser.access_token : (sb.auth.session && (await sb.auth.getSession()).data.session.access_token)}`, "Content-Type": "application/json" },
+          });
+          if (!res.ok && res.status !== 204) {
+            const body = await res.json().catch(() => ({}));
+            throw new Error(body.msg || `HTTP ${res.status}`);
+          }
+          localStorage.removeItem(CFG_KEY);
+          toast("🗑️ Account deleted");
+          await signOut();
+        } catch (e) {
+          acctFail("Couldn't delete account: " + (e.message || e));
+        }
+      });
+      $("accountBtn").addEventListener("click", acctOpen);
+      acctDlg.addEventListener("cancel", (e) => { e.preventDefault(); acctClose(); });
 
       // ================= Currency =================
       const CURRENCIES = ["INR", "USD", "EUR", "GBP", "AED", "SAR", "PKR", "BDT", "NGN", "CAD", "AUD", "JPY", "KES", "ZAR", "PHP"];
