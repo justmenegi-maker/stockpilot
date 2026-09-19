@@ -40,6 +40,8 @@ function makeEl(tag) {
     showModal: noop,
     close: noop,
     remove: noop,
+    open: false,
+    showModal() { this.open = true; },
     scrollTo: noop,
     scrollHeight: 0,
   };
@@ -109,7 +111,7 @@ const els = {
   cfgKey: makeEl("textarea"),
   authFields: makeEl("div"),
   authEmail: makeEl("input"),
-  authPass: makeEl("input"),
+  authPass: Object.assign(makeEl("input"), { type: "password" }),
   storeNameField: makeEl("div"),
   storeName: makeEl("input"),
   authErr: makeEl("p"),
@@ -130,6 +132,39 @@ const els = {
   soldEditList: makeEl("div"),
   soldMsg: makeEl("p"),
   soldClose: makeEl("button"),
+  // Login page + account settings
+  authTabs: makeEl("div"),
+  authSub: makeEl("p"),
+  passEye: makeEl("button"),
+  sbAdv: makeEl("div"),
+  sbAdvToggle: makeEl("button"),
+  sbAdvBody: makeEl("div"),
+  cfgTest: makeEl("button"),
+  authProjHint: makeEl("p"),
+  accountBtn: makeEl("button"),
+  accountDialog: makeEl("dialog"),
+  acctTitle: makeEl("h3"),
+  acctSub: makeEl("p"),
+  acctName: makeEl("input"),
+  acctEmail: makeEl("input"),
+  acctCurPass: makeEl("input"),
+  acctNewPass: makeEl("input"),
+  acctErr: makeEl("p"),
+  acctSaved: makeEl("span"),
+  acctRefresh: makeEl("button"),
+  acctSaveProfile: makeEl("button"),
+  acctConnStatus: makeEl("div"),
+  acctCfgUrl: makeEl("input"),
+  acctCfgKey: makeEl("textarea"),
+  acctCfgSave: makeEl("button"),
+  acctCfgTest: makeEl("button"),
+  acctCfgReset: makeEl("button"),
+  acctProjHint: makeEl("p"),
+  acctSignOut: makeEl("button"),
+  acctDelete: makeEl("button"),
+  acctProfile: makeEl("div"),
+  acctCloud: makeEl("div"),
+  acctDanger: makeEl("div"),
 };
 for (const k of Object.keys(els)) els[k].id = k;
 
@@ -145,6 +180,8 @@ const storageFactory = (map) => ({
 const listeners = {};
 const documentObj = {
   getElementById: (id) => els[id] || null,
+  querySelector: () => null,
+  querySelectorAll: () => [],
   createElement: (tag) => makeEl(tag),
   documentElement: { dataset: {} },
   addEventListener(type, fn) { (listeners[type] = listeners[type] || []).push(fn); },
@@ -162,6 +199,7 @@ const sandbox = {
   window: {},
   Date,
   Math,
+  URL,
   JSON,
   Map,
   Set,
@@ -193,7 +231,7 @@ function check(name, cond, extra) {
 // appended to the app source before it runs. The script must be evaluated exactly
 // once in this context — a second run would redeclare its top-level consts.
 sandbox.__capture = null;
-const epilogue = `;__capture = { state, handleCommand, localStores, showView, resetReports, renderReportPanel, uiView: () => uiView, createStoreOffline, loadOfflineStore, runAutoPrune, pruneStateSales, pruneCutoffDate, RETENTION_DAYS, salesBreakdown, isCustomSale, saveSalesEdit, deleteSaleRow, renderSoldList, renderSoldEditor, openSold, recordMovement, takeStock, adjustQty, reportText };`;
+const epilogue = `;__capture = { state, handleCommand, localStores, showView, resetReports, renderReportPanel, uiView: () => uiView, createStoreOffline, loadOfflineStore, runAutoPrune, pruneStateSales, pruneCutoffDate, RETENTION_DAYS, salesBreakdown, isCustomSale, saveSalesEdit, deleteSaleRow, renderSoldList, renderSoldEditor, openSold, recordMovement, takeStock, adjustQty, reportText, acctOpen, acctFillProfile, testCloudConnection, friendlyAuthError, acctDlg: () => acctDlg };`;
 try {
   vm.runInContext(scripts[0] + epilogue, sandbox, { filename: "index.html:inline+epilogue" });
 } catch (e) {
@@ -386,10 +424,91 @@ try {
   // D) Store-use rows must never be editable as sales (sold editor filters kind==="sale").
   check("sold editor lists sales only", app.renderSoldEditor() === undefined && true); // smoke: runs without error
 
+  console.log("\n— Login page & account settings —");
+  // Auth tab switching wired through real listeners.
+  els.authTabs.children.push(Object.assign(makeEl("button"), { dataset: { mode: "signin" } }));
+  els.authTabs.children.push(Object.assign(makeEl("button"), { dataset: { mode: "signup" } }));
+  for (const b of els.authTabs.children) b.addEventListener("click", () => {}); // (app already wired its own)
+  check("friendlyAuthError maps bad credentials", /incorrect/i.test(app.friendlyAuthError({ message: "Invalid login credentials" })));
+  check("friendlyAuthError maps unconfirmed email", /confirmation link/i.test(app.friendlyAuthError({ message: "Email not confirmed" })));
+  check("friendlyAuthError passes through unknown", /weird failure/.test(app.friendlyAuthError({ message: "weird failure" })));
+  // Password toggle flips the input type.
+  els.passEye.click();
+  check("pass eye reveals password", els.authPass.type === "text");
+  els.passEye.click();
+  check("pass eye hides password", els.authPass.type === "password");
+  // Advanced Supabase panel toggles.
+  els.sbAdvToggle.click();
+  check("sb advanced panel opens", els.sbAdv.classList.contains("open"));
+  els.sbAdvToggle.click();
+  check("sb advanced panel closes", !els.sbAdv.classList.contains("open"));
+  // Account dialog opens (offline mode → falls back to the auth screen) and profile fill is safe.
+  app.acctOpen();
+  check("acctOpen offline shows auth screen", els.authBackdrop.style.display === "flex");
+  check("acctFillProfile tolerates null user", app.acctFillProfile() === undefined);
+
+  console.log("\n— Supabase connection test & login validation —");
+  // Auth tab toggle flips heading + store-name field visibility.
+  els.authToggle.click();
+  check("toggle to signup shows store name field", !els.storeNameField.classList.contains("hidden") && /Create your/.test(els.authTitle.textContent), els.authTitle.textContent);
+  els.authToggle.click();
+  check("toggle back to signin hides store name field", els.storeNameField.classList.contains("hidden"));
+
+  // Login card cloud settings: synchronous validation + save (async tests follow below).
+  sandbox.window.supabase = { createClient: () => ({}) }; // factory replaced in async tail
+  els.cfgUrl.value = "notaurl";
+  els.cfgKey.value = "k".repeat(40);
+  els.cfgSave.click();
+  check("cfgSave rejects a bad URL", els.authErr.style.display === "block" && /supabase\.co/.test(els.authErr.textContent), els.authErr.textContent);
+  els.cfgUrl.value = "https://abc123.supabase.co";
+  els.cfgSave.click();
+  check("cfgSave stores a valid connection", (() => { try { return JSON.parse(store.get("stockpilot.cloud.cfg")).url === "https://abc123.supabase.co"; } catch { return false; } })());
 } catch (e) {
   failed++;
   console.error("❌ Harness error:", e.stack || e);
 }
 
-console.log(failed ? `\n${failed} check(s) FAILED` : "\nAll checks passed");
-process.exit(failed ? 1 : 0);
+// ---- Async tail: connection tests need real microtask drainage ----
+(async () => {
+  try {
+    const mkClient = (opts) => ({
+      auth: { getSession: async () => (opts.authError ? { error: new Error(opts.authError) } : { error: null, data: { session: null } }) },
+      from: (t) => ({
+        select: () => ({
+          limit: async () => (opts.tables && opts.tables[t] ? { error: new Error(opts.tables[t]) } : { error: null, data: [] }),
+        }),
+      }),
+    });
+
+    console.log("\n— Supabase connection test (async) —");
+    const r1 = await app.testCloudConnection(mkClient({}), "https://abc123.supabase.co");
+    check("conn test: healthy project passes", r1.ok === true, JSON.stringify(r1));
+    check("conn test: names host + auth + all tables", /REACHABLE_OK abc123\.supabase\.co/.test(r1.summary) && /AUTH_OK/.test(r1.summary) && /TABLE stores: OK/.test(r1.summary) && /TABLE chats: OK/.test(r1.summary) && /ALL_GOOD/.test(r1.summary), r1.summary);
+
+    const r2 = await app.testCloudConnection(mkClient({ tables: { sales: "relation does not exist" } }), "https://abc123.supabase.co");
+    check("conn test: missing table fails with setup hint", r2.ok === false && /TABLE sales: MISSING/.test(r2.summary) && /RUN_SETUP_SQL/.test(r2.summary), r2.summary);
+
+    const r3 = await app.testCloudConnection(mkClient({ authError: "boom" }), "https://abc123.supabase.co");
+    check("conn test: auth failure surfaces message", r3.ok === false && /AUTH_FAIL boom/.test(r3.summary), r3.summary);
+
+    const r4 = await app.testCloudConnection(mkClient({}), "notaurl");
+    check("conn test: invalid URL rejected", r4.ok === false && /INVALID_URL/.test(r4.summary), r4.summary);
+
+    // Login card "Test connection" button end-to-end with a mocked client factory.
+    sandbox.window.supabase = { createClient: () => mkClient({}) };
+    els.cfgUrl.value = "https://abc123.supabase.co";
+    els.cfgKey.value = "k".repeat(40);
+    els.cfgTest.click();
+    await new Promise((r) => setTimeout(r, 0));
+    check("cfgTest reports all-good for a healthy project", /ALL_GOOD/.test(els.authProjHint.textContent), els.authProjHint.textContent);
+    els.cfgUrl.value = "notaurl";
+    els.cfgTest.click();
+    await new Promise((r) => setTimeout(r, 0));
+    check("cfgTest rejects an invalid URL", /URL should look like/.test(els.authProjHint.textContent), els.authProjHint.textContent);
+  } catch (e) {
+    failed++;
+    console.error("❌ Async harness error:", e.stack || e);
+  }
+  console.log(failed ? `\n${failed} check(s) FAILED` : "\nAll checks passed");
+  process.exit(failed ? 1 : 0);
+})();

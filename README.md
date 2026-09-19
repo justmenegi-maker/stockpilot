@@ -10,6 +10,11 @@ Open `index.html` in any browser — that's it. No build, no install, no server 
 
 ## Features
 
+- **Polished sign-in screen** — Sign in / Create account tabs, show-password toggle, friendly error messages (wrong password, unconfirmed email, rate limits), a loading state on the submit button, and a collapsible **Supabase connection (advanced)** panel with a **Test connection** button that checks reachability, the auth service, and all four required tables
+- **Account settings (👤 Account in the header, when signed in)** — three tabs:
+  - **Profile** — edit your display name and password (email shown read-only); changes are saved to your Supabase auth user and follow you to every device
+  - **☁️ Supabase** — live connection status (reachable / auth / tables), switch to a different project (URL + key) with a validated **Save & reconnect**, **Test connection**, or return to the pre-wired default project
+  - **Danger zone** — log out on this device, or permanently delete your account (stores, items, sales and chats cascade-delete with it)
 - **Inventory table** — add / edit / delete items with description, ±1 quick adjust, search, filter, sort
 - **Stats dashboard** — total items, units in stock, stock value, low/out count, units sold today, store-use units today
 - **Sold Today with edit & delete** — every sale and store-use of today is listed under the stats, tagged with custom prices. Click **✏️ Edit sales** (or the Sold Today card) to fix a mis-clicked quantity or price, or **Delete (restock)** a row to return its units to stock — reports update instantly
@@ -54,7 +59,7 @@ Open `index.html` in any browser — that's it. No build, no install, no server 
 StockPilot is **pre-wired to its Supabase project** — the URL (`https://xfeeggctabymhgepyhmo.supabase.co`) and the publishable key are already in the app:
 
 1. In the Supabase dashboard open **SQL Editor → New query**, paste the whole contents of `supabase-setup.sql` (this folder) and click **Run**. This creates the tables with row-level security, so every account can only ever see its own data. *(One time — the app can't create tables itself.)*
-2. Open StockPilot and **Sign up** with your email and a password — no keys to paste.
+2. Open StockPilot and **Sign up** with your email and a password — no keys to paste. (You can point the app at a different project later from **👤 Account → ☁️ Supabase**.)
 3. During sign-up you name your first store. After that a **store dropdown** appears in the header — pick it to switch stores; every store keeps its own items, sales, reports, and currency.
 
 To point StockPilot at a *different* Supabase project, run `supabase-setup.sql` there, then paste that project's URL and publishable/anon key in the sign-in screen and click **Save cloud settings** — explicit values always override the pre-wired ones.
