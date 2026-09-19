@@ -72,6 +72,13 @@ Notes:
 - Signing in on **another device or browser** with the same email shows the same stores and data.
 - To add a store beyond the first: click **＋ Store** in the header. Each store starts empty with its own items, sales, reports, and currency — the database supports unlimited stores per account.
 
+## Tests
+
+Run from the project root (Node 18+; no dependencies to install):
+
+- `npm test` (or `node scripts/test-regression.js`) — full regression harness: runs the app's inline script in a sandboxed DOM/localStorage and exercises the chat engine, detailed reports, custom sales, store use, edit-sale, auto-cleanup, store switching, theme, the login screen, the account dialog, and the Supabase connection test (102 checks).
+- `npm run test:e2e` (or `node scripts/e2e-cloud-test.js [--keep]`) — live end-to-end cloud test against the wired Supabase project: signup → store → item → sale → verify persisted rows → cleanup. Add `--keep` to leave the test data in place. *Note: while the project's "Confirm email" setting is ON, signup returns no session and the script stops with instructions; the app itself handles this with a check-your-inbox flow.*
+
 ## Notes
 
 - Without cloud configured, the app is fully usable offline on one store (previous behavior).
