@@ -415,6 +415,10 @@
       .auth-card .btn { width: 100%; justify-content: center; }
       .auth-submit { margin-top: 4px; padding: 11px 14px; font-size: 14.5px; border-radius: 12px; }
       .auth-links { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; gap: 8px; flex-wrap: wrap; }
+      .pending-wrap { text-align: center; padding: 4px 0 2px; }
+      .pending-icon { font-size: 36px; margin-bottom: 4px; }
+      .pending-title { font-weight: 800; font-size: 16px; margin: 0 0 6px; }
+      .pending-sub { color: var(--muted); font-size: 13px; line-height: 1.5; margin: 0 0 12px; }
       .auth-links .btn { width: auto; font-size: 13px; padding: 8px 10px; }
       .err { color: var(--danger); font-size: 12.5px; margin: 8px 0 0; white-space: pre-wrap; text-align: left; }
       .sb-adv { border-top: 1px dashed var(--line); margin-top: 16px; padding-top: 12px; }
@@ -698,7 +702,20 @@
         </div>
         <p class="err" id="authErr" style="display:none"></p>
         <button class="btn primary auth-submit" id="authSubmit">Sign in</button>
-        <div class="auth-links">
+        <div id="authPending" style="display:none">
+          <div class="pending-wrap">
+            <div class="pending-icon">📧</div>
+            <p class="pending-title">Almost there — check your inbox</p>
+            <p class="pending-sub" id="pendingSub"></p>
+          </div>
+          <button class="btn primary auth-submit" id="pendingResend">Resend email</button>
+          <div class="auth-links" id="pendingLinks">
+            <button class="btn ghost" id="pendingBack">← Back to sign in</button>
+          </div>
+          <p class="proj-hint" id="pendingHint"></p>
+          <p class="note">No email yet? Wait a minute and resend — free Supabase projects send at most ~2 emails/hour. Check spam too.</p>
+        </div>
+        <div class="auth-links" id="authLinksRow">
           <button class="btn ghost" id="offlineBtn">Continue without cloud</button>
           <button class="btn ghost" id="authToggle">Create account</button>
         </div>
@@ -1422,10 +1439,12 @@
       function authFail(msg) { authErr.textContent = msg; authErr.style.display = "block"; }
       function setAuthMode(mode) {
         authMode = mode;
-        $("authTitle").textContent = mode === "signup" ? "☁️ Create your StockPilot account" : "☁️ Sign in to StockPilot";
-        $("authSubmit").textContent = mode === "signup" ? "Sign up" : "Sign in";
-        $("authToggle").textContent = mode === "signup" ? "Already have an account? Sign in" : "Need an account? Sign up";
+        $("authTitle").textContent = mode === "signup" ? "Create your StockPilot account" : "Sign in to StockPilot";
+        $("authSubmit").textContent = mode === "signup" ? "Create account" : "Sign in";
+        $("authToggle").textContent = mode === "signup" ? "I already have an account" : "New here? Create account";
         $("storeNameField").classList.toggle("hidden", mode !== "signup");
+        $("authPending").style.display = "none";
+        for (const id of ["authTabs", "authFields", "authSubmit", "authLinksRow"]) $(id).style.display = "";
         authErr.style.display = "none";
       }
       // Auth tabs + password visibility toggle.
@@ -1452,6 +1471,10 @@
           [/password should be at least/i, "Password must be at least 6 characters."],
           [/unable to validate email/i, "That doesn't look like a valid email address."],
           [/failed to fetch|networkerror|load failed/i, "Can't reach the server — check your internet connection."],
+          [/signups not allowed/i, "New signups are turned off on this Supabase project — enable email sign-up under Authentication → Providers."],
+          [/only request this after/i, "Please wait a minute before requesting another email."],
+          [/row-level security/i, "Cloud write was rejected — run supabase-setup.sql on this project (tables/policies missing)."],
+          [/database error saving new user/i, "The server couldn't create the account right now — try again shortly."],
         ];
         for (const [re, msg] of map) if (re.test(m)) return msg;
         return m;
@@ -1499,8 +1522,8 @@
       // .hidden class, so use style.display for these.
       function applySessionUI() {
         const isCloud = signedIn();
-        // Store picker and "＋ Store" work offline too; logout is cloud-only.
-        for (const id of ["storeSelect", "addStoreBtn"]) $(id).style.display = "";
+        // Store picker, "＋ Store" and 👤 Account work in both modes; logout is cloud-only.
+        for (const id of ["storeSelect", "addStoreBtn", "accountBtn"]) $(id).style.display = "";
         $("logoutBtn").style.display = isCloud ? "" : "none";
         $("signinBtn").style.display = isCloud ? "none" : "";
         renderStoresUI();
@@ -1722,13 +1745,17 @@
         const { data: stores, error } = await sb.from("stores").select("*").order("created_at");
         if (error) throw error;
         cloudStores = stores || [];
-        if (createdStore && !cloudStores.length) {
-          const row = { id: uid(), user_id: user.id, name: createdStore, currency: state.currency };
+        // Self-healing: an account with no stores (e.g. signup interrupted by email
+        // confirmation, or a project glitch) gets its first store created here, so
+        // nobody is ever locked out with "No stores found".
+        if (!cloudStores.length) {
+          const name = createdStore || loadLS("stockpilot.pendingStore", null) || "My Store";
+          try { localStorage.removeItem("stockpilot.pendingStore"); } catch {}
+          const row = { id: uid(), user_id: user.id, name, currency: state.currency };
           const { error: e2 } = await sb.from("stores").insert(row);
           if (e2) throw e2;
           cloudStores = [row];
         }
-        if (!cloudStores.length) throw new Error("No stores found for this account");
         const last = localStorage.getItem(LS_LASTSTORE);
         const target = cloudStores.find((s) => s.id === last) || cloudStores[0];
         await activateStore(target.id);
@@ -1856,10 +1883,18 @@
             const { data, error } = await sb.auth.signUp({ email, password: pass });
             if (error) throw error;
             const user = data.user;
+            if (user && !data.session) {
+              // "Confirm email" is ON: no session yet. Show the next step instead
+              // of failing — after confirming, sign-in self-heals the first store.
+              showPending(email, storeName);
+              return;
+            }
+            localStorage.removeItem("stockpilot.pendingStore");
             await afterSignIn(user, storeName);
           } else {
             const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
             if (error) throw error;
+            localStorage.removeItem("stockpilot.pendingStore");
             await afterSignIn(data.user, null);
           }
         } catch (e) {
@@ -1869,6 +1904,34 @@
           btn.textContent = authMode === "signup" ? "Create account" : "Sign in";
         }
       });
+
+      // ---- Check-your-inbox state (signup with "Confirm email" enabled) ----
+      function showPending(email, storeName) {
+        // Remember the wanted first-store name; sign-in uses it after confirmation.
+        if (storeName) localStorage.setItem("stockpilot.pendingStore", JSON.stringify(storeName));
+        $("pendingSub").innerHTML = `We sent a confirmation link to <b>${esc(email)}</b>. Click it, then sign in here — your store "${esc(storeName || "My Store")}" will be waiting.`;
+        for (const id of ["authTabs", "authFields", "authSubmit", "authLinksRow"]) $(id).style.display = "none";
+        $("authErr").style.display = "none";
+        $("pendingHint").textContent = "";
+        $("authPending").style.display = "";
+      }
+      $("pendingResend").addEventListener("click", async () => {
+        const btn = $("pendingResend");
+        const email = ($("authEmail").value || "").trim();
+        if (!email) { $("pendingHint").textContent = "Enter your email first — go back and fill it in."; return; }
+        btn.disabled = true;
+        $("pendingHint").textContent = "⏳ Resending…";
+        try {
+          const { error } = await sb.auth.resend({ type: "signup", email });
+          if (error) throw error;
+          $("pendingHint").textContent = "✅ Email resent — give it a minute, and check spam.";
+        } catch (e) {
+          $("pendingHint").textContent = friendlyAuthError(e);
+        } finally {
+          setTimeout(() => { btn.disabled = false; }, 45000); // respect the 60s resend window
+        }
+      });
+      $("pendingBack").addEventListener("click", () => setAuthMode("signin"));
 
       // ================= Account settings =================
       // Profile tab: edit the account's display name (auth.users.raw_user_meta_data)

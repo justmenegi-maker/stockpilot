@@ -119,6 +119,13 @@ const els = {
   authToggle: makeEl("button"),
   offlineBtn: makeEl("button"),
   cfgSave: makeEl("button"),
+  // Check-your-inbox signup state
+  authPending: makeEl("div"),
+  pendingSub: makeEl("p"),
+  pendingResend: makeEl("button"),
+  pendingBack: makeEl("button"),
+  pendingHint: makeEl("p"),
+  pendingLinks: makeEl("div"),
   storesGrid: makeEl("div"),
   storeCreate: makeEl("button"),
   toastWrap: makeEl("div"),
@@ -134,6 +141,7 @@ const els = {
   soldClose: makeEl("button"),
   // Login page + account settings
   authTabs: makeEl("div"),
+  authLinksRow: makeEl("div"),
   authSub: makeEl("p"),
   passEye: makeEl("button"),
   sbAdv: makeEl("div"),
@@ -231,7 +239,7 @@ function check(name, cond, extra) {
 // appended to the app source before it runs. The script must be evaluated exactly
 // once in this context — a second run would redeclare its top-level consts.
 sandbox.__capture = null;
-const epilogue = `;__capture = { state, handleCommand, localStores, showView, resetReports, renderReportPanel, uiView: () => uiView, createStoreOffline, loadOfflineStore, runAutoPrune, pruneStateSales, pruneCutoffDate, RETENTION_DAYS, salesBreakdown, isCustomSale, saveSalesEdit, deleteSaleRow, renderSoldList, renderSoldEditor, openSold, recordMovement, takeStock, adjustQty, reportText, acctOpen, acctFillProfile, testCloudConnection, friendlyAuthError, acctDlg: () => acctDlg };`;
+const epilogue = `;__capture = { state, handleCommand, localStores, showView, resetReports, renderReportPanel, uiView: () => uiView, createStoreOffline, loadOfflineStore, runAutoPrune, pruneStateSales, pruneCutoffDate, RETENTION_DAYS, salesBreakdown, isCustomSale, saveSalesEdit, deleteSaleRow, renderSoldList, renderSoldEditor, openSold, recordMovement, takeStock, adjustQty, reportText, acctOpen, acctFillProfile, testCloudConnection, friendlyAuthError, acctDlg: () => acctDlg, showPending, setAuthMode, afterSignIn, authMode: () => authMode };`;
 try {
   vm.runInContext(scripts[0] + epilogue, sandbox, { filename: "index.html:inline+epilogue" });
 } catch (e) {
@@ -447,12 +455,26 @@ try {
   check("acctOpen offline shows auth screen", els.authBackdrop.style.display === "flex");
   check("acctFillProfile tolerates null user", app.acctFillProfile() === undefined);
 
+  console.log("\n— Signup recovery (check-your-inbox) —");
+  // Pending view hides the form and shows the resend flow, keyed to the email.
+  app.showPending("owner@shop.com", "Main Shop");
+  check("pending view shows", els.authPending.style.display === "");
+  check("form hidden while pending", els.authFields.style.display === "none" && els.authSubmit.style.display === "none");
+  check("pending copy names the email", /owner@shop\.com/.test(els.pendingSub.innerHTML), els.pendingSub.innerHTML);
+  check("store name stashed for self-heal", (() => { try { return JSON.parse(store.get("stockpilot.pendingStore")) === "Main Shop"; } catch { return false; } })());
+  els.pendingBack.click();
+  check("back returns to the sign-in form", els.authPending.style.display === "none" && els.authFields.style.display === "");
+  // setAuthMode restores everything even if the pending view was open.
+  app.showPending("x@y.com", "S");
+  els.authToggle.click();
+  check("mode switch clears pending view", els.authPending.style.display === "none");
+
   console.log("\n— Supabase connection test & login validation —");
-  // Auth tab toggle flips heading + store-name field visibility.
-  els.authToggle.click();
-  check("toggle to signup shows store name field", !els.storeNameField.classList.contains("hidden") && /Create your/.test(els.authTitle.textContent), els.authTitle.textContent);
-  els.authToggle.click();
-  check("toggle back to signin hides store name field", els.storeNameField.classList.contains("hidden"));
+  // Auth tab toggle flips heading + store-name field visibility (explicit modes).
+  app.setAuthMode("signup");
+  check("signup mode shows store name field", !els.storeNameField.classList.contains("hidden") && /account/i.test(els.authTitle.textContent), els.authTitle.textContent);
+  app.setAuthMode("signin");
+  check("signin mode hides store name field", els.storeNameField.classList.contains("hidden"));
 
   // Login card cloud settings: synchronous validation + save (async tests follow below).
   sandbox.window.supabase = { createClient: () => ({}) }; // factory replaced in async tail
@@ -505,6 +527,79 @@ try {
     els.cfgTest.click();
     await new Promise((r) => setTimeout(r, 0));
     check("cfgTest rejects an invalid URL", /URL should look like/.test(els.authProjHint.textContent), els.authProjHint.textContent);
+
+    console.log("\n— End-to-end account creation (mock Supabase, Confirm email ON) —");
+    // Simulate the wire: signUp returns a user but NO session (Confirm email enabled).
+    // The mock is chainable/thenable like supabase-js, and lives INSIDE the vm —
+    // the app's `sb` is a vm-scoped let binding that Node cannot reassign directly.
+    sandbox.__mock = (() => {
+      let storesTable = [];
+      const counts = { insert: 0 };
+      const builder = (table) => {
+        const b = {};
+        b.select = () => b;
+        b.eq = () => b;
+        b.order = () => b;
+        b.lt = () => b;
+        b.limit = async () => ({ error: null, data: [] });
+        b.single = async () => ({ data: null, error: null });
+        b.insert = async (rows) => { counts.insert++; for (const r of [].concat(rows)) storesTable.push(JSON.parse(JSON.stringify(r))); return { error: null }; };
+        b.upsert = async () => ({ error: null });
+        b.update = () => ({ eq: async () => ({ error: null }) });
+        b.delete = () => ({ eq: async () => ({ error: null }), lt: async () => ({ data: [], error: null }) });
+        b.then = (res, rej) => {
+          if (table === "stores") return Promise.resolve({ data: JSON.parse(JSON.stringify(storesTable)), error: null }).then(res, rej);
+          return Promise.resolve({ data: [], error: null }).then(res, rej);
+        };
+        return b;
+      };
+      return {
+        counts, stores: () => storesTable, reset: () => { storesTable = []; counts.insert = 0; },
+        auth: {
+          getSession: async () => ({ error: null, data: { session: null } }),
+          signUp: async () => ({ data: { user: { id: "u-1", email: els.authEmail.value.trim() }, session: null }, error: null }),
+          signInWithPassword: async () => ({ data: { user: { id: "u-1", email: els.authEmail.value.trim() }, session: { user: { id: "u-1" } } }, error: null }),
+          signOut: async () => ({ error: null }),
+          resend: async () => ({ error: null }),
+          updateUser: async (u) => ({ data: { user: { id: "u-1" } }, error: null }),
+        },
+        from: builder,
+      };
+    })();
+    vm.runInContext("sb = __mock;", sandbox);
+    const mock = sandbox.__mock;
+    app.setAuthMode("signup");
+    els.authEmail.value = "newowner@shop.com";
+    els.authPass.value = "hunter22";
+    els.storeName.value = "Corner Shop";
+    els.authSubmit.click();
+    await new Promise((r) => setTimeout(r, 0));
+    // FIX 1: no crash, no RLS error — the pending (check-your-inbox) view shows.
+    check("signup w/ confirm email shows check-your-inbox", els.authPending.style.display === "", JSON.stringify({ pending: els.authPending.style.display, err: els.authErr.textContent }));
+    check("no error shown to the user", els.authErr.style.display !== "block", els.authErr.textContent);
+    check("pending copy has the email + store name", /newowner@shop\.com/.test(els.pendingSub.innerHTML) && /Corner Shop/.test(els.pendingSub.innerHTML), els.pendingSub.innerHTML);
+    check("store name stashed for after-confirmation", (() => { try { return JSON.parse(store.get("stockpilot.pendingStore")) === "Corner Shop"; } catch { return false; } })());
+    check("resend flow exists and is enabled", els.pendingResend.disabled !== true);
+
+    // FIX 2: after the user confirms (simulated by password sign-in), the account
+    // that previously failed mid-signup has ZERO stores — sign-in must self-heal.
+    mock.reset(); // account exists but no store row ever made it in
+    const zeroStoreUser = { id: "u-1", email: "newowner@shop.com" };
+    let lockout = null;
+    try {
+      await app.afterSignIn(zeroStoreUser, null); // pendingStore is picked up here
+    } catch (e) { lockout = e; }
+    check("sign-in with zero stores does NOT throw 'No stores found'", lockout === null, lockout && (lockout.stack || lockout.message));
+    check("a first store was auto-created", mock.counts.insert === 1, `inserts=${mock.counts.insert}`);
+    check("store name from signup is preserved", mock.stores().length === 1 && mock.stores()[0].name === "Corner Shop", JSON.stringify(mock.stores()));
+    check("pendingStore stash cleared after healing", store.get("stockpilot.pendingStore") == null, String(store.get("stockpilot.pendingStore")));
+
+    // Re-run: an account that already has stores must not get a duplicate.
+    const before = mock.counts.insert;
+    await app.afterSignIn(zeroStoreUser, null);
+    check("existing stores are not duplicated", mock.counts.insert === before, `inserts=${mock.counts.insert}`);
+    check("session UI reflects signed-in state", els.accountBtn.style.display === "" && els.logoutBtn.style.display === "", JSON.stringify({ acct: els.accountBtn.style.display, out: els.logoutBtn.style.display, signin: els.signinBtn.style.display }));
+
   } catch (e) {
     failed++;
     console.error("❌ Async harness error:", e.stack || e);
