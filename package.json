@@ -1,0 +1,11 @@
+{
+  "name": "stockpilot",
+  "version": "1.0.0",
+  "description": "Zero-dependency single-file multi-store inventory app with a chat assistant and optional Supabase cloud sync.",
+  "private": true,
+  "scripts": {
+    "test": "node scripts/test-regression.js",
+    "test:e2e": "node scripts/e2e-cloud-test.js",
+    "start": "python3 -m http.server 5179"
+  }
+}
