@@ -502,6 +502,19 @@ try {
   check("CSP meta forbids objects, forms and base hijacking", /object-src 'none'/.test(html) && /form-action 'none'/.test(html) && /base-uri 'none'/.test(html));
   check("referrer policy is no-referrer", /<meta name="referrer" content="no-referrer" \/>/.test(html));
   check("cloud-sourced ids are escaped in attributes", !/data-(id|del)="\$\{(it|s)\./.test(scripts[0]) && (scripts[0].match(/data-(id|del)="\$\{esc\(/g) || []).length === 8);
+
+  // ---- PWA: manifest, icons, service worker ----
+  let manifestOk = false, manifestIcons = 0;
+  try { const mf = JSON.parse(fs.readFileSync("manifest.webmanifest", "utf8")); manifestOk = mf.display === "standalone" && mf.start_url === "./"; manifestIcons = mf.icons.length; } catch {}
+  check("PWA manifest is valid standalone with relative start_url", manifestOk);
+  check("PWA manifest declares 4 icons incl. maskable", manifestIcons === 4);
+  check("index.html links manifest, theme-color and apple icon", /rel="manifest" href="\.\/manifest\.webmanifest"/.test(html) && /name="theme-color" content="#4f46e5"/.test(html) && /rel="apple-touch-icon"/.test(html));
+  check("CSP allows same-origin manifest and worker", /manifest-src 'self'/.test(html) && /worker-src 'self'/.test(html));
+  let swOk = false;
+  try { const sw = fs.readFileSync("sw.js", "utf8"); swOk = sw.includes('addEventListener("fetch"') && sw.includes('url.origin !== self.location.origin') && sw.includes('caches.open'); } catch {}
+  check("service worker: fetch handler, cross-origin passthrough, versioned cache", swOk);
+  check("SW registration is guarded (no crash in sandbox/file://)", /typeof location !== "undefined"/.test(scripts[0]) && /navigator\.serviceWorker\.register\("\.\/sw\.js"\)/.test(scripts[0]));
+  check("generated icons exist with valid PNG signatures", ["icons/icon-192.png","icons/icon-512.png","icons/maskable-192.png","icons/maskable-512.png"].every((p) => { try { const b = fs.readFileSync(p); return b[0] === 0x89 && b[1] === 0x50; } catch { return false; } }));
 } catch (e) {
   failed++;
   console.error("❌ Harness error:", e.stack || e);

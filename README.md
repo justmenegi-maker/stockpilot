@@ -8,6 +8,15 @@ Open `index.html` in any browser — that's it. No build, no install, no server 
 
 (Or serve it: `python -m http.server 5179` then visit http://127.0.0.1:5179/)
 
+## Install as an app (PWA)
+
+StockPilot is a full Progressive Web App — installable, offline-capable, with its own window and icon:
+
+- **Install:** Chrome/Edge → the ⊕ install icon in the address bar; Android → "Add to Home screen"; iOS Safari → Share → "Add to Home Screen". Once installed it opens in its own window, without browser UI.
+- **Offline:** a service worker (`sw.js`) caches the app shell (page, manifest, icons). Navigations are network-first so updates arrive as soon as they're deployed, then the cached shell keeps the app open with no connection. Your data itself is already stored locally (and synced to Supabase when signed in).
+- **Privacy:** the service worker never intercepts or caches cross-origin traffic — Supabase API calls always hit the network and no auth/data responses are stored in the SW cache.
+- **Icons:** regenerate with `npm run icons` (`scripts/gen-icons.js`, zero dependencies, deterministic output).
+
 ## Features
 
 - **Polished sign-in screen** — Sign in / Create account tabs, show-password toggle, friendly error messages (wrong password, unconfirmed email, rate limits), a loading state on the submit button, and a collapsible **Supabase connection (advanced)** panel with a **Test connection** button that checks reachability, the auth service, and all four required tables
@@ -52,6 +61,7 @@ Open `index.html` in any browser — that's it. No build, no install, no server 
 - **Multi-store** — 🏬 **Stores** opens an all-stores overview: one card per store with items, units, stock value, low/out alerts, units sold today, and today's revenue. Create and delete stores; each store has **its own page, stock, sales log, reports, currency, and its own assistant conversation** — so each store's chat keeps its own context.
 - **Cloud sync (optional)** — see **Cloud setup** below; offline stores carry over automatically on first sign-in
 - **Dark / light mode** — follows system preference, toggle in header
+- **Installable PWA** — standalone window, app icon, and an offline-cached app shell (see *Install as an app*)
 - **Keyboard shortcuts** — `N` = add item, `/` = open assistant
 
 ## Cloud setup (multi-store, login, cloud save) — ~2 minutes, once
