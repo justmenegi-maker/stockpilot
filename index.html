@@ -601,6 +601,24 @@
         /* Forms: 16px inputs everywhere -> no iOS zoom on focus. */
         .field input, .field select, .field textarea { font-size: 16px; }
         .sold-edit input[type="number"] { font-size: 16px; }
+
+        /* Toolbar: search gets its own row; filter & sort share the second. */
+        .toolbar { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .toolbar .search { grid-column: 1 / -1; min-width: 0; }
+
+        /* Reports: comfortable segment taps; report text scrolls, never overflows. */
+        .rp-seg button { padding: 8px 10px; font-size: 12px; }
+        .rp-report { max-height: 40dvh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+        /* Dialog forms: stacked fields instead of cramped half-width pairs. */
+        .dialog-body .field-row { display: block; }
+        .dialog-body .field-row .field { margin-bottom: 10px; }
+
+        /* Auth tabs: comfortable 40px targets. */
+        .auth-tabs button { min-height: 40px; }
+
+        /* Toasts sit above the floating pills instead of under them. */
+        #toastWrap { bottom: calc(140px + env(safe-area-inset-bottom, 0px)); }
       }
       /* Tiny phones: tighten further without losing usability. */
       @media (max-width: 380px) {
@@ -734,7 +752,7 @@
       <div class="chat-msgs" id="chatMsgs"></div>
       <div class="chat-chips" id="chatChips"></div>
       <div class="chat-input-row">
-        <input id="chatInput" placeholder='e.g. "add 12 hammers" or "sold 2 hammers"' autocomplete="off" />
+        <input id="chatInput" placeholder='e.g. "add 12 hammers" or "multi add 1 xts @ 599"' autocomplete="off" />
         <button class="chat-send" id="chatSend" title="Send">➤</button>
       </div>
     </div>
@@ -1011,7 +1029,7 @@
       }
 
       const GREETING = [
-        { role: "bot", text: '👋 Hi! I\'m your inventory assistant.\nTry:\n• "add 10 pens"\n• "sold 3 pens"\n• "set pens to 25"\n• "what\'s low?"' },
+        { role: "bot", text: '👋 Hi! I\'m your inventory assistant.\nTry:\n• "add 10 pens"\n• "sold 3 pens"\n• "multi add 1 vivo y18 @ 1800, 1 xts @ 599"\n• "set pens to 25"\n• "what\'s low?"' },
       ];
 
       const state = {
@@ -2275,7 +2293,7 @@
       const chatMsgs = $("chatMsgs");
       const chatInput = $("chatInput");
       const SUGGESTIONS = [
-        "add 10 pens",
+        "multi add 1 vivo y18 @ 1800, 1 xts @ 599",
         "sold 3 pens",
         "set pens to 25",
         "what's low?",
@@ -2341,6 +2359,74 @@
         b.textContent = c;
         b.addEventListener("click", () => { chatInput.value = c; sendChat(); });
         $("chatChips").appendChild(b);
+      }
+
+      // ================= Multi add (batch) =================
+      // "multi add 1 vivo y18 @ 1800, 1 xts @ 599, 9 yxc @ 799" creates/restocks
+      // every comma-separated "qty name @ price" entry in one go. Chunks split
+      // only where a comma is followed by a new "qty name" pattern, so thousands
+      // separators like 1,800 survive inside a price.
+      function parseMultiAddChunk(chunk) {
+        const c = String(chunk).trim().replace(/[.\s]+$/, "");
+        const m = c.match(/^(\d+)\s+(?:of\s+)?(.+?)\s*(?:@|at|for|rs\.?|inr|\u20b9)\s*(\u20b9)?\s*(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)$/i);
+        if (!m) return null;
+        const qty = parseInt(m[1], 10);
+        const name = m[2].trim();
+        const price = parseFloat(m[4].replace(/,/g, ""));
+        if (!qty || qty < 1 || !name || !isFinite(price) || price < 0) return null;
+        return { qty, name, price };
+      }
+
+      function runMultiAdd(t) {
+        const body = t.replace(/^(?:multi\s*[- ]?add|bulk\s*[- ]?add|add\s+multi)\b/, "").trim();
+        const chunks = body.split(/\s*,\s*(?=\d+\s+\S)/).map((c) => c.trim()).filter(Boolean);
+        if (!chunks.length) return '\ud83e\udd14 Give me at least one item, e.g. "multi add 1 vivo y18 @ 1800".';
+        const ok = [];
+        const failed = [];
+        for (const chunk of chunks) {
+          let parsed = parseMultiAddChunk(chunk);
+          if (!parsed && chunk.includes(",")) {
+            // Stray junk after a comma ("2 pens @ 50, and some glue") shouldn't
+            // sink the valid entry before it: retry up to the last comma.
+            const cut = chunk.lastIndexOf(",");
+            parsed = parseMultiAddChunk(chunk.slice(0, cut));
+            if (parsed) {
+              const rest = chunk.slice(cut + 1).trim();
+              if (rest) failed.push(rest);
+            }
+          }
+          if (parsed) ok.push(parsed);
+          else failed.push(chunk);
+        }
+        if (!ok.length) {
+          return '\ud83e\udd14 I couldn\'t read any of that. Use "qty item @ price" for each, e.g.\n"multi add 1 vivo y18 @ 1800, 1 xts @ 599".';
+        }
+        const lines = [];
+        let units = 0;
+        for (const p of ok) {
+          const dup = state.items.find((x) => normalizeName(x.name) === normalizeName(p.name));
+          if (dup) {
+            dup.qty += p.qty;
+            if (p.price > 0) dup.price = p.price;
+            units += p.qty;
+            const st = statusOf(dup);
+            const note = st === "out" ? " \ud83d\udea8 out!" : st === "low" ? " \u26a0\ufe0f low!" : "";
+            lines.push(`\u2022 ${dup.name} +${p.qty} \u2192 ${dup.qty} @ ${money(p.price)}${note}`);
+          } else {
+            const item = { _id: uid(), name: titleCase(p.name), qty: p.qty, price: p.price, cost: 0, threshold: DEFAULT_THRESHOLD, category: undefined, description: undefined, createdAt: Date.now() };
+            state.items.push(item);
+            units += p.qty;
+            const st = statusOf(item);
+            const note = st === "out" ? " \ud83d\udea8 out!" : st === "low" ? " \u26a0\ufe0f low!" : "";
+            lines.push(`\u2022 ${item.name} \u00d7${p.qty} @ ${money(p.price)}${note}`);
+          }
+        }
+        saveAll();
+        const head = `\u2705 Added ${ok.length} ${ok.length === 1 ? "item" : "items"} (${units} ${units === 1 ? "unit" : "units"}):`;
+        const tail = failed.length
+          ? `\n\u26a0\ufe0f Skipped ${failed.length} ${failed.length === 1 ? "line" : "lines"} (couldn\'t read: ${failed.join("; ")}) \u2014 use "qty item @ price".`
+          : "";
+        return [head, ...lines].join("\n") + tail;
       }
 
       // ================= Command router =================
@@ -2678,6 +2764,11 @@
       })();
 
       const ROUTES = [
+        {
+          help: '• "multi add 1 vivo y18 @ 1800, 1 xts @ 599, 9 yxc @ 799" — add several items at once',
+          match: (x, t) => /^(?:multi\s*[- ]?add|bulk\s*[- ]?add|add\s+multi)\b/.test(t),
+          run: (x, t) => runMultiAdd(t),
+        },
         {
           match: (x, t) => /^(help|what can you do\??|commands\??)$/.test(t),
           run: helpReply,
