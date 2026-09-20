@@ -515,6 +515,14 @@ try {
   check("service worker: fetch handler, cross-origin passthrough, versioned cache", swOk);
   check("SW registration is guarded (no crash in sandbox/file://)", /typeof location !== "undefined"/.test(scripts[0]) && /navigator\.serviceWorker\.register\("\.\/sw\.js"\)/.test(scripts[0]));
   check("generated icons exist with valid PNG signatures", ["icons/icon-192.png","icons/icon-512.png","icons/maskable-192.png","icons/maskable-512.png"].every((p) => { try { const b = fs.readFileSync(p); return b[0] === 0x89 && b[1] === 0x50; } catch { return false; } }));
+
+  // ---- Mobile UI: viewport, safe areas, stable inputs ----
+  check("viewport has viewport-fit=cover for safe-area insets", /content="width=device-width, initial-scale=1, viewport-fit=cover"/.test(html));
+  check("mobile CSS layer exists (760px breakpoints)", (html.match(/@media \(max-width: 760px\)/g) || []).length >= 2);
+  check("mobile: 16px inputs prevent iOS focus zoom", /font-size: 16px; \/\* prevents iOS focus zoom \*\//.test(html) && /\.field input, \.field select, \.field textarea \{ font-size: 16px; \}/.test(html));
+  check("mobile: safe-area padding on header, chat, FAB and Add Item", /env\(safe-area-inset-top/.test(html) && /env\(safe-area-inset-bottom/.test(html));
+  check("mobile: icon-only secondary header buttons (4 labels)", (html.match(/class="btn-label"/g) || []).length === 4 && /\.btn-label \{ display: none; \}/.test(html));
+  check("mobile: dialog buttons full-width 44px targets", /\.dialog-actions \.btn \{ flex: 1 1 auto; justify-content: center; min-height: 44px; \}/.test(html));
 } catch (e) {
   failed++;
   console.error("❌ Harness error:", e.stack || e);
