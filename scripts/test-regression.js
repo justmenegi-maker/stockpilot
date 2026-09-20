@@ -549,6 +549,13 @@ try {
   check("generated icons exist with valid PNG signatures", ["icons/icon-192.png","icons/icon-512.png","icons/maskable-192.png","icons/maskable-512.png"].every((p) => { try { const b = fs.readFileSync(p); return b[0] === 0x89 && b[1] === 0x50; } catch { return false; } }));
 
   // ---- Mobile UI: viewport, safe areas, stable inputs ----
+  // ---- Simplified UI language ----
+  check("UI: brand mark is flat (no gradient)", !/linear-gradient\(135deg, #6366f1, #8b5cf6\)/.test(html));
+  check("UI: default buttons are borderless tinted pills", /border: 1px solid transparent;\s*\n\s*background: color-mix\(in srgb, var\(--ink\) 5%, transparent\);/.test(html));
+  check("UI: stat numbers are unboxed", /\.stat \{\s*\n\s*background: transparent;\s*\n\s*border: none;/.test(html));
+  check("UI: sold list uses dividers, not cards", /border-bottom: 1px solid var\(--line\);\s*\n\s*border-radius: 0;/.test(html) && /\.sold-row:last-child \{ border-bottom: none; \}/.test(html));
+  check("UI: section titles are sentence case", html.includes("<h2>All stores</h2>") && html.includes("<h3>Sold today</h3>") && html.includes("<h3>Sales reports</h3>"));
+  check("UI: sold-today stat is an edit button with affordance", /class="stat stat-btn"/.test(html) && /stat-hint/.test(html));
   check("document has a <title>", /<title>[^<]+<\/title>/.test(html) && /StockPilot/.test((html.match(/<title>([^<]*)<\/title>/) || [])[1] || ""));
   check("viewport has viewport-fit=cover for safe-area insets", /content="width=device-width, initial-scale=1, viewport-fit=cover"/.test(html));
   check("mobile CSS layer exists (760px breakpoints)", (html.match(/@media \(max-width: 760px\)/g) || []).length >= 2);
