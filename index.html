@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="description" content="StockPilot — a fast, offline-capable multi-store inventory manager with sales reports, low-stock alerts, a chat assistant, and optional Supabase cloud sync." />
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'" />
     <meta name="referrer" content="no-referrer" />
@@ -519,6 +519,99 @@
         display: none;
       }
       .rp-report.show { display: block; }
+      /* ================= Mobile refinement (<=760px) ================= */
+      /* Stability first: consistent 16px inputs (no iOS focus-zoom), safe-area
+         padding, single-tap targets >= 40px, and fewer reflow surprises. */
+      @media (max-width: 760px) {
+        body { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+        header {
+          padding: calc(10px + env(safe-area-inset-top, 0px)) 12px calc(10px + env(safe-area-inset-bottom, 0px));
+          gap: 8px;
+          row-gap: 8px;
+        }
+        .logo { font-size: 16px; }
+        .logo-box { width: 26px; height: 26px; border-radius: 8px; font-size: 13px; }
+        /* Buttons: compact but comfortably tappable. */
+        .header-actions { gap: 6px; }
+        .header-actions .btn { padding: 9px 11px; font-size: 13px; border-radius: 11px; }
+        .header-actions .btn.ghost { min-height: 38px; }
+        .header-actions select { max-width: 116px; }
+        .btn-label { display: none; } /* secondary buttons go icon-only, titles/aria stay */
+        /* Keep the primary action visible: + Add Item sticks to the viewport
+           bottom-right, out of the chat FAB's way (left of it). */
+        #addItemBtn {
+          position: fixed;
+          right: calc(16px + env(safe-area-inset-right, 0px));
+          bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+          z-index: 45;
+          box-shadow: 0 10px 26px rgba(2, 6, 23, 0.22);
+          border-radius: 999px;
+          padding: 12px 18px;
+          font-size: 14px;
+        }
+        .fab-chat { right: calc(16px + env(safe-area-inset-right, 0px)); bottom: calc(84px + env(safe-area-inset-bottom, 0px)); width: 52px; height: 52px; font-size: 22px; }
+        main { padding: 12px 12px 120px; }
+
+        /* Stats: two tidy columns. */
+        .stats { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+        .stat { padding: 12px; border-radius: 12px; }
+        .stat .value { font-size: 20px; }
+
+        /* Inventory table: roomier rows, narrower gutter, always scrollable. */
+        .table-wrap { border-radius: 12px; }
+        table { font-size: 13.5px; min-width: 560px; }
+        thead th { padding: 9px 10px; }
+        tbody td { padding: 11px 10px; }
+        .qty-controls .btn { padding: 6px 12px; font-size: 13px; min-height: 32px; }
+        .row-actions .btn.icon { min-width: 36px; min-height: 34px; display: inline-flex; align-items: center; justify-content: center; }
+
+        /* Sold-today rows wrap instead of overflowing. */
+
+        /* Dialogs and auth card: edge-to-edge with breathing room, no cut-offs. */
+        dialog { width: calc(100vw - 16px); max-height: calc(100dvh - 24px); }
+        .dialog-body { padding: 16px; max-height: calc(100dvh - 24px); }
+        .dialog-actions { position: sticky; bottom: 0; background: var(--panel); padding: 10px 0 2px; }
+        .dialog-actions .btn { flex: 1 1 auto; justify-content: center; min-height: 44px; }
+        .auth-card { padding: 20px 16px 14px; }
+        #authBackdrop { align-items: flex-start; padding: 12px; overflow-y: auto; }
+        .auth-card { margin: auto 0; }
+        .auth-card .btn { min-height: 44px; }
+
+        /* Account dialog tabs stay on one line. */
+        .acct-tabs { flex-wrap: wrap; }
+
+        /* Stores overview: single column cards. */
+        .stores-grid { grid-template-columns: 1fr; }
+
+        /* Chat: edge-to-edge sheet with an iOS-safe keyboard offset. */
+        .chat-panel {
+          right: 8px; left: 8px; bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+          width: auto;
+          height: min(70dvh, calc(100dvh - 92px));
+          border-radius: 16px;
+        }
+        .chat-head { padding: 12px 14px; }
+        .chat-input-row input { font-size: 16px; /* prevents iOS focus zoom */ padding: 11px 12px; }
+        .chat-send { width: 46px; min-height: 44px; }
+        .chat-chips { overflow-x: auto; flex-wrap: nowrap; padding-bottom: 8px; scrollbar-width: none; }
+        .chat-chips::-webkit-scrollbar { display: none; }
+        .msg { max-width: 92%; }
+        .fab-chat, #addItemBtn { touch-action: manipulation; }
+
+        /* Forms: 16px inputs everywhere -> no iOS zoom on focus. */
+        .field input, .field select, .field textarea { font-size: 16px; }
+        .sold-edit input[type="number"] { font-size: 16px; }
+      }
+      /* Tiny phones: tighten further without losing usability. */
+      @media (max-width: 380px) {
+        .header-actions .btn { padding: 8px 9px; font-size: 12.5px; }
+        .stat .value { font-size: 18px; }
+        #addItemBtn { padding: 11px 15px; font-size: 13.5px; }
+      }
+      /* Landscape phones: chat sheet keeps a sane height. */
+      @media (max-width: 760px) and (orientation: landscape) {
+        .chat-panel { height: calc(100dvh - 60px); }
+      }
     </style>
   </head>
   <body>
@@ -526,12 +619,12 @@
       <div class="logo"><div class="logo-box">📦</div> <span id="brandName">StockPilot</span></div>
       <div class="spacer"></div>
       <div class="header-actions">
-        <button class="btn ghost" id="signinBtn" title="Sign in / cloud settings">☁️ Sign in</button>
-        <button class="btn ghost" id="accountBtn" title="Account settings" style="display:none">👤 Account</button>
-        <button class="btn ghost" id="storesBtn" title="All stores overview">🏬 Stores</button>
+        <button class="btn ghost" id="signinBtn" title="Sign in / cloud settings" aria-label="Sign in">☁️ <span class="btn-label">Sign in</span></button>
+        <button class="btn ghost" id="accountBtn" title="Account settings" aria-label="Account" style="display:none">👤 <span class="btn-label">Account</span></button>
+        <button class="btn ghost" id="storesBtn" title="All stores overview" aria-label="Stores">🏬 <span class="btn-label">Stores</span></button>
         <select id="storeSelect" aria-label="Store" title="Store" style="display:none"></select>
         <button class="btn ghost" id="addStoreBtn" title="Add another store" style="display:none">＋ Store</button>
-        <button class="btn ghost" id="logoutBtn" title="Sign out" style="display:none">Log out</button>
+        <button class="btn ghost" id="logoutBtn" title="Sign out" aria-label="Log out" style="display:none">🚪 <span class="btn-label">Log out</span></button>
         <select id="currencySelect" aria-label="Currency" title="Currency"></select>
         <button class="alert-badge" id="alertBadge" title="Show low-stock items" style="display:none"></button>
         <button class="btn icon" id="themeBtn" title="Toggle theme">🌙</button>
