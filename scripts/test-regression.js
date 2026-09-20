@@ -556,6 +556,10 @@ try {
 
   // ---- Mobile UI: viewport, safe areas, stable inputs ----
   // ---- Simplified UI language ----
+  // ---- Color scheme: beige/white light, black/dark-grey dark ----
+  check("colors: light theme is beige+white", /--bg: #f2ede3;/.test(html) && /--panel: #fffdf8;/.test(html) && /--line: #e2d9c8;/.test(html));
+  check("colors: dark theme is black+dark grey", /--bg: #0a0a0a;/.test(html) && /--panel: #171717;/.test(html) && /--line: #2a2a2a;/.test(html));
+  check("colors: status tints are theme-mixed (no hardcoded pastels)", !/#fef2f2|#fffbeb|#f0fdf4|#450a0a|#451a03|#052e16/.test(html));
   check("UI: brand mark is flat (no gradient)", !/linear-gradient\(135deg, #6366f1, #8b5cf6\)/.test(html));
   check("UI: default buttons are borderless tinted pills", /border: 1px solid transparent;\s*\n\s*background: color-mix\(in srgb, var\(--ink\) 5%, transparent\);/.test(html));
   check("UI: stat numbers are unboxed", /\.stat \{\s*\n\s*background: transparent;\s*\n\s*border: none;/.test(html));
