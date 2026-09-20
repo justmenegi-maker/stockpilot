@@ -94,7 +94,7 @@
       [data-theme="dark"] .alert-badge { background: #450a0a; border-color: #7f1d1d; }
       .alert-badge:hover { filter: brightness(1.05); }
       main { max-width: 1150px; margin: 0 auto; padding: clamp(12px, 3vw, 24px); padding-bottom: 96px; }
-      .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 16px; }
+      .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0 12px; margin-bottom: 8px; border-bottom: 1px solid var(--line); }
       @media (max-width: 760px) { .stats { grid-template-columns: repeat(2, 1fr); } }
       .stat {
         background: transparent;
@@ -112,7 +112,8 @@
       .stat-btn:hover .stat-hint { display: inline; }
       .stat .value { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
       .sold-section { margin-bottom: 16px; }
-      .sold-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+      .sold-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; padding: 8px 0 6px; border-top: 1px solid var(--line); }
+      .sold-section { border-bottom: 1px solid var(--line); padding-bottom: 6px; }
       .sold-head h3 { margin: 0; font-size: 15px; }
       .sold-list { display: flex; flex-direction: column; }
       .sold-row {
@@ -497,7 +498,7 @@
         padding: 14px 16px;
         margin-bottom: 16px;
       }
-      .reports-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+      .reports-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding-bottom: 8px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
       .reports-head h3 { margin: 0; font-size: 15px; letter-spacing: -0.01em; }
       .rp-seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
       .rp-seg button {
@@ -518,16 +519,44 @@
       .rp-custom input[type="date"]:focus { border-color: var(--brand); }
       .rp-report {
         margin-top: 12px;
-        padding: 12px 14px;
+        padding: 14px 4px 2px;
         border-radius: 12px;
-        background: color-mix(in srgb, var(--panel) 55%, var(--bg));
-        border: 1px solid var(--line);
+        background: transparent;
+        border: none;
+        border-top: 1px solid var(--line);
         font-size: 13px;
         line-height: 1.55;
-        white-space: pre-wrap;
         display: none;
       }
       .rp-report.show { display: block; }
+      /* Summary strip */
+      .rp-summary { display: flex; flex-wrap: wrap; gap: 6px 22px; padding: 2px 10px 12px; }
+      .rp-summary .kpi { display: flex; flex-direction: column; gap: 2px; }
+      .rp-summary .kpi b { font-size: 17px; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+      .rp-summary .kpi span { font-size: 11.5px; color: var(--muted); font-weight: 600; }
+      .rp-summary .kpi b.danger { color: var(--danger); }
+      .rp-summary .kpi b.ok { color: var(--ok); }
+      /* Ruled tables */
+      .rp-title { font-size: 11.5px; font-weight: 700; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; margin: 10px 10px 6px; }
+      .rp-table-wrap { overflow-x: auto; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+      table.rp-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: unset; }
+      .rp-table th {
+        text-align: left; font-size: 11px; font-weight: 700; color: var(--muted);
+        letter-spacing: 0.04em; text-transform: uppercase;
+        padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap;
+      }
+      .rp-table td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+      .rp-table tr:last-child td { border-bottom: none; }
+      .rp-table tbody tr:hover { background: color-mix(in srgb, var(--ink) 3%, transparent); }
+      .rp-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+      .rp-table .pos { color: var(--muted); }
+      .rp-table tfoot td {
+        border-top: 2px solid var(--line); border-bottom: none;
+        font-weight: 800; padding: 9px 10px; font-variant-numeric: tabular-nums;
+      }
+      .rp-table .share-bar { display: inline-block; height: 6px; border-radius: 4px; background: var(--brand); vertical-align: middle; min-width: 2px; }
+      .rp-empty { padding: 14px 10px 18px; color: var(--muted); }
+      .rp-section + .rp-section { margin-top: 16px; }
       /* ================= Mobile refinement (<=760px) ================= */
       /* Stability first: consistent 16px inputs (no iOS focus-zoom), safe-area
          padding, single-tap targets >= 40px, and fewer reflow surprises. */
@@ -2677,6 +2706,73 @@
       // ================= Reports panel (Daily / Weekly / Monthly / Custom) =================
       // One shared builder: chat replies and the on-page panel both render this,
       // so the numbers can never disagree.
+      // ================= Report tables (panel HTML) =================
+      // Same data as reportText() but rendered as ruled tables: summary KPIs,
+      // per-item rows with qty / revenue / avg price / share bar, totals footer.
+      function reportRows(span, from, to) {
+        if (span === "custom") {
+          const ok = (v) => !!v && v.length === 10 && !isNaN(Date.parse(v));
+          if (!ok(from) || !ok(to)) return null;
+          if (from > to) { const tmp = from; from = to; to = tmp; }
+          return { rows: state.sales.filter((s) => s.date >= from && s.date <= to), label: `${from} → ${to}` };
+        }
+        return { rows: salesIn(span), label: spanLabel(span) };
+      }
+
+      function kpiHtml(value, label, cls) {
+        return `<div class="kpi"><b class="${cls || ""}">${value}</b><span>${label}</span></div>`;
+      }
+
+      function reportTableHtml(data) {
+        const { rows, label } = data;
+        const sales = rows.filter((s) => s.kind === "sale");
+        const uses = rows.filter((s) => s.kind === "use");
+        const units = sales.reduce((n, s) => n + s.qty, 0);
+        const revenue = sales.reduce((n, s) => n + s.qty * s.price, 0);
+        const breakdown = salesBreakdown(sales);
+        const maxQty = Math.max(1, ...breakdown.map(([, v]) => v.qty));
+
+        let html = `<div class="rp-summary">${kpiHtml(String(units), "units sold")}${kpiHtml(money(revenue), "revenue", "ok")}`;
+        html += kpiHtml(String(breakdown.length), "items sold");
+        html += kpiHtml(String(uses.reduce((n, s) => n + s.qty, 0)), "store-use units", uses.length ? "danger" : "");
+        html += `</div>`;
+
+        // Items sold table
+        html += `<div class="rp-section"><div class="rp-title">Items sold — ${esc(label)}</div>`;
+        if (breakdown.length) {
+          html += `<div class="rp-table-wrap"><table class="rp-table"><thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Revenue</th><th class="num">Avg price</th><th class="num">Share</th></tr></thead><tbody>`;
+          for (const [name, v] of breakdown) {
+            const avg = v.qty ? v.revenue / v.qty : 0;
+            const pct = units ? Math.round((v.qty / units) * 100) : 0;
+            html += `<tr><td>${esc(name)}</td><td class="num">${v.qty}</td><td class="num">${money(v.revenue)}</td><td class="num pos">${money(avg)}</td><td class="num"><span class="share-bar" style="width:${Math.max(6, Math.round((v.qty / maxQty) * 56))}px"></span> ${pct}%</td></tr>`;
+          }
+          html += `</tbody><tfoot><tr><td>Total</td><td class="num">${units}</td><td class="num">${money(revenue)}</td><td class="num pos">${units ? money(revenue / units) : "—"}</td><td class="num">100%</td></tr></tfoot></table></div>`;
+        } else {
+          html += `<div class="rp-empty">No sales in this period.</div>`;
+        }
+        html += `</div>`;
+
+        // Custom sales table
+        const customs = sales.filter((s) => isCustomSale(s));
+        if (customs.length) {
+          const cQty = customs.reduce((n, s) => n + s.qty, 0);
+          const cRev = customs.reduce((n, s) => n + s.qty * s.price, 0);
+          html += `<div class="rp-section"><div class="rp-title">Custom sales (separate)</div><div class="rp-table-wrap"><table class="rp-table"><thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Price each</th><th class="num">Amount</th></tr></thead><tbody>`;
+          for (const s of customs) html += `<tr><td>${esc(s.name)}</td><td class="num">${s.qty}</td><td class="num pos">${money(s.price)}</td><td class="num">${money(s.qty * s.price)}</td></tr>`;
+          html += `</tbody><tfoot><tr><td>Total</td><td class="num">${cQty}</td><td></td><td class="num">${money(cRev)}</td></tr></tfoot></table></div></div>`;
+        }
+
+        // Store use table
+        if (uses.length) {
+          const byUse = new Map();
+          for (const s of uses) byUse.set(s.name, (byUse.get(s.name) || 0) + s.qty);
+          html += `<div class="rp-section"><div class="rp-title">Store use (not sales)</div><div class="rp-table-wrap"><table class="rp-table"><thead><tr><th>Item</th><th class="num">Qty used</th></tr></thead><tbody>`;
+          for (const [name, q] of [...byUse.entries()].sort((a, b) => b[1] - a[1])) html += `<tr><td>${esc(name)}</td><td class="num">${q}</td></tr>`;
+          html += `</tbody><tfoot><tr><td>Total</td><td class="num">${uses.reduce((n, s) => n + s.qty, 0)}</td></tr></tfoot></table></div></div>`;
+        }
+        return html;
+      }
+
       function reportText(span, from, to) {
         let rows, label;
         if (span === "custom") {
@@ -2729,9 +2825,13 @@
       function renderReportPanel() {
         const out = $("rpOutput");
         if (!out) return;
-        out.textContent = rpSpan === "custom"
-          ? reportText("custom", $("rpFrom").value, $("rpTo").value)
-          : reportText(rpSpan);
+        const data = rpSpan === "custom"
+          ? reportRows("custom", $("rpFrom").value, $("rpTo").value)
+          : reportRows(rpSpan);
+        out.innerHTML = data ? reportTableHtml(data) : "";
+        if (!data) {
+          out.textContent = reportText("custom", $("rpFrom").value, $("rpTo").value);
+        }
         out.classList.add("show");
       }
 
