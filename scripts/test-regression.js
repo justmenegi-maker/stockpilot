@@ -549,6 +549,7 @@ try {
   check("generated icons exist with valid PNG signatures", ["icons/icon-192.png","icons/icon-512.png","icons/maskable-192.png","icons/maskable-512.png"].every((p) => { try { const b = fs.readFileSync(p); return b[0] === 0x89 && b[1] === 0x50; } catch { return false; } }));
 
   // ---- Mobile UI: viewport, safe areas, stable inputs ----
+  check("document has a <title>", /<title>[^<]+<\/title>/.test(html) && /StockPilot/.test((html.match(/<title>([^<]*)<\/title>/) || [])[1] || ""));
   check("viewport has viewport-fit=cover for safe-area insets", /content="width=device-width, initial-scale=1, viewport-fit=cover"/.test(html));
   check("mobile CSS layer exists (760px breakpoints)", (html.match(/@media \(max-width: 760px\)/g) || []).length >= 2);
   check("mobile: 16px inputs prevent iOS focus zoom", /font-size: 16px; \/\* prevents iOS focus zoom \*\//.test(html) && /\.field input, \.field select, \.field textarea \{ font-size: 16px; \}/.test(html));
