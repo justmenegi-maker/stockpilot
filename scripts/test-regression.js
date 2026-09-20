@@ -265,8 +265,11 @@ try {
   console.log("\n— Chat engine —");
   check("add item", /Created/.test(handleCommand("add 10 pens") || ""), handleCommand("add 10 pens"));
   check("sale", /Removed|left/.test(handleCommand("sold 3 pens") || ""));
-  check("daily report (chat)", /detailed report/.test(handleCommand("daily report") || ""));
-  check("custom report via dates", /detailed report/.test(handleCommand("report from 2026-09-01 to 2026-09-05") || ""), handleCommand("report from 2026-09-01 to 2026-09-05"));
+  const unwrap = (r) => (r && typeof r === "object" && r.__html ? r.__html : String(r ?? ""));
+  check("daily report (chat) is a table", /rp-table/.test(unwrap(handleCommand("daily report"))) && /Items sold/.test(unwrap(handleCommand("daily report"))));
+  const todayStr = new Date().toLocaleDateString("en-CA");
+  const customHtml = unwrap(handleCommand(`report from 2026-09-01 to ${todayStr}`));
+  check("custom report via dates is a table", /rp-table/.test(customHtml) && /Items sold/.test(customHtml), customHtml.slice(0, 120));
   check("profit", /Profit/.test(handleCommand("profit this week") || ""));
 
   console.log("\n— Multi add (batch) —");
@@ -426,16 +429,19 @@ try {
   handleCommand("sold 1 pens");
   handleCommand("store use 2 pens");
   handleCommand("custom sale vivo y18 @ 999");
-  const report = handleCommand("daily report") || "";
-  check("report header is detailed", /detailed report/.test(report), report.slice(0, 80));
+  const report = unwrap(handleCommand("daily report"));
+  check("report header is detailed", /Items sold/.test(report) && /Most sold items/.test(report), report.slice(0, 80));
   check("report names sold items", /Hammers/i.test(report) && /Pens/i.test(report), report);
-  check("report shows per-item qty", /2 sold/.test(report) && /5 sold/.test(report), report);
-  check("report lists store use items", /Store use \(not sales\)/.test(report) && /Pens — 4 used/.test(report), report);
+  check("report shows per-item qty", /<td class="num">2<\/td>/.test(report) && /<td class="num">5<\/td>/.test(report), report.slice(0, 200));
+  check("report lists store use items", /Store use \(not sales\)/.test(report) && /<td>Pens<\/td><td class="num">4<\/td>/.test(report), report.slice(-400));
   check("report has custom sales section", /Custom sales \(separate\)/.test(report), report);
-  check("custom sales show prices", /@ \\(?:₹|Rs|\\$)/.test(report) || /@ /.test(report), report.split("Custom sales")[1] || "");
+  check("custom sales show prices", /Price each/.test(report) && /1,600\.00/.test(report), report.split("Custom sales")[1] ? report.split("Custom sales")[1].slice(0, 160) : report.slice(0, 160));
   const y18row = state.sales.filter((s) => /y18/i.test(s.name) && s.kind === "sale").slice(-1)[0];
-  check("report custom price matches record", y18row && report.includes(`@ ${y18row.price.toLocaleString(undefined, { style: "currency", currency: state.currency })}`), y18row && y18row.price);
+  check("report custom price matches record", y18row && report.includes(y18row.price.toLocaleString(undefined, { style: "currency", currency: state.currency })), y18row && y18row.price);
   check("custom row flagged", y18row && (y18row.custom === true || app.isCustomSale(y18row)));
+  // Chart: most-sold items with bars sorted by qty.
+  check("chat report has most-sold chart", /Most sold items/.test(report) && (report.match(/bar-row/g) || []).length >= 3, (report.match(/bar-row/g) || []).length);
+  check("chart bars sized by qty share", /width:100%/.test(report) && /bar-fill/.test(report));
 
   // Panel shows the same detail as chat.
   app.resetReports();
@@ -561,7 +567,10 @@ try {
   check("reports: per-item columns qty/revenue/avg/share", /Avg price/.test(scripts[0]) && /share-bar/.test(scripts[0]));
   check("reports: totals footer rows built", scripts[0].includes("<tfoot>") && (scripts[0].match(/<\/tfoot>/g) || []).length === 3);
   check("reports: custom + store-use tables", /Custom sales \(separate\)/.test(scripts[0]) && /Store use \(not sales\)/.test(scripts[0]));
-  check("reports: chat keeps plain text", /detailed report:/.test(scripts[0]));
+  check("reports: chat replies render as tables+chart", /chatReportReply/.test(scripts[0]) && /__html/.test(scripts[0]) && /msg-html/.test(html));
+  check("reports: chat html messages bypass textContent safely", /if \(m\.html\) div\.innerHTML = m\.text;/.test(scripts[0]) && /else div\.textContent = m\.text;/.test(scripts[0]));
+  check("reports: most-sold chart (top 7, CSS bars)", /Most sold items/.test(scripts[0]) && /bar-fill/.test(scripts[0]) && /slice\(0, 7\)/.test(scripts[0]));
+  check("reports: chart + tables styled for chat width", /\.msg\.bot\.msg-html/.test(html) && /\.bar-track/.test(html));  check("reports: chat keeps plain text", /detailed report:/.test(scripts[0]));
   check("UI: sold-today stat is an edit button with affordance", /class="stat stat-btn"/.test(html) && /stat-hint/.test(html));
   check("document has a <title>", /<title>[^<]+<\/title>/.test(html) && /StockPilot/.test((html.match(/<title>([^<]*)<\/title>/) || [])[1] || ""));
   check("viewport has viewport-fit=cover for safe-area insets", /content="width=device-width, initial-scale=1, viewport-fit=cover"/.test(html));
