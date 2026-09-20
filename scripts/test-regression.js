@@ -495,6 +495,13 @@ try {
   check("token factory: memory-only probes", (inline.match(/newClient\(url, key, "memory"\)/g) || []).length === 2);
   check("token factory: legacy localStorage token purge present", /\/\^sb-\.\*-auth-token\//.test(inline));
   check("token factory: no default createClient without storage opts", !/createClient\(url, key\)/.test(inline) && !/createClient\(SB_URL, SB_KEY\)/.test(inline));
+
+  // ---- P0.4 security: CSP, referrer policy, attribute escaping ----
+  // html (head metas live outside the inline script) and scripts[0] are in scope.
+  check("CSP meta restricts network to Supabase + CDN", /http-equiv="Content-Security-Policy"[^>]*connect-src 'self' https:\/\/\*\.supabase\.co wss:\/\/\*\.supabase\.co/.test(html));
+  check("CSP meta forbids objects, forms and base hijacking", /object-src 'none'/.test(html) && /form-action 'none'/.test(html) && /base-uri 'none'/.test(html));
+  check("referrer policy is no-referrer", /<meta name="referrer" content="no-referrer" \/>/.test(html));
+  check("cloud-sourced ids are escaped in attributes", !/data-(id|del)="\$\{(it|s)\./.test(scripts[0]) && (scripts[0].match(/data-(id|del)="\$\{esc\(/g) || []).length === 8);
 } catch (e) {
   failed++;
   console.error("❌ Harness error:", e.stack || e);
