@@ -485,6 +485,16 @@ try {
   els.cfgUrl.value = "https://abc123.supabase.co";
   els.cfgSave.click();
   check("cfgSave stores a valid connection", (() => { try { return JSON.parse(store.get("stockpilot.cloud.cfg")).url === "https://abc123.supabase.co"; } catch { return false; } })());
+
+  // ---- P0 security: token storage factory (source-level invariants) ----
+  // html (read at top of file) is the full index.html source; the inline script
+  // is the single <script> block the harness extracted above (scripts[0]).
+  const inline = scripts[0];
+  check("token factory: exactly one raw createClient (the factory)", (inline.match(/window\.supabase\.createClient\(/g) || []).length === 1);
+  check("token factory: main client persists to sessionStorage", /newClient\(SB_URL, SB_KEY, "session"\)/.test(inline));
+  check("token factory: memory-only probes", (inline.match(/newClient\(url, key, "memory"\)/g) || []).length === 2);
+  check("token factory: legacy localStorage token purge present", /\/\^sb-\.\*-auth-token\//.test(inline));
+  check("token factory: no default createClient without storage opts", !/createClient\(url, key\)/.test(inline) && !/createClient\(SB_URL, SB_KEY\)/.test(inline));
 } catch (e) {
   failed++;
   console.error("❌ Harness error:", e.stack || e);

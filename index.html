@@ -812,7 +812,37 @@
       let CFG = loadCFG();
       let SB_URL = ((CFG.url || "").trim() || DEFAULT_SB_URL);
       let SB_KEY = ((CFG.key || "").trim() || DEFAULT_SB_KEY);
-      let sb = SB_URL && SB_KEY && window.supabase ? window.supabase.createClient(SB_URL, SB_KEY) : null;
+      // ---- Client factory & token storage (P0: tokens never touch localStorage) ----
+      // The main client keeps auth tokens in sessionStorage (they die with the tab,
+      // nothing written to disk); probe clients keep them in memory only. Every
+      // Supabase client in the app is built through this one factory, so it is
+      // guaranteed to hold everywhere.
+      const SB_TOKEN_NS = "stockpilot.sb.auth";
+      function sessionStore() {
+        return {
+          getItem: (k) => sessionStorage.getItem(SB_TOKEN_NS + "." + k),
+          setItem: (k, v) => { sessionStorage.setItem(SB_TOKEN_NS + "." + k, v); },
+          removeItem: (k) => { sessionStorage.removeItem(SB_TOKEN_NS + "." + k); },
+        };
+      }
+      function memoryStore() {
+        const mem = new Map();
+        return {
+          getItem: (k) => (mem.has(k) ? mem.get(k) : null),
+          setItem: (k, v) => { mem.set(k, v); },
+          removeItem: (k) => { mem.delete(k); },
+        };
+      }
+      // persist: "session" = main app client (sessionStorage) | "memory" = connection probes.
+      function newClient(url, key, persist) {
+        return window.supabase.createClient(url, key, { auth: { storage: persist === "memory" ? memoryStore() : sessionStore() } });
+      }
+      // Purge auth tokens that older versions persisted in localStorage.
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && /^sb-.*-auth-token/.test(k)) { try { localStorage.removeItem(k); i--; } catch {} }
+      }
+      let sb = SB_URL && SB_KEY && window.supabase ? newClient(SB_URL, SB_KEY, "session") : null;
       let cloudUser = null;      // signed-in user
       let cloudStores = [];      // rows of public.stores for this user
 
@@ -827,7 +857,7 @@
         if (!/^https:\/\/.+\.supabase\.co\/?$/.test(url)) return { error: "URL should look like https://xxxxx.supabase.co" };
         if (key.length < 30) return { error: "Paste the publishable/anon key from Settings → API." };
         if (!window.supabase) return { error: "Supabase library failed to load — check your connection and reload." };
-        return { client: window.supabase.createClient(url, key) };
+        return { client: newClient(url, key, "session") };
       }
 
       // True when the active store is a signed-in cloud store (i.e. cloud reads/writes apply).
@@ -1807,7 +1837,7 @@
         hint.textContent = "⏳ Testing connection…";
         if (!/^https:\/\/.+\.supabase\.co\/?$/.test(url)) { hint.textContent = "❌ URL should look like https://xxxxx.supabase.co"; return; }
         if (key.length < 30) { hint.textContent = "❌ Paste the publishable/anon key from Settings → API."; return; }
-        const probe = window.supabase.createClient(url, key);
+        const probe = newClient(url, key, "memory");
         const res = await testCloudConnection(probe, url);
         hint.textContent = res.summary;
       });
@@ -2047,7 +2077,7 @@
           el.textContent = "❌ Paste the publishable/anon key from Settings → API.";
           return;
         }
-        const probe = window.supabase.createClient(url, key);
+        const probe = newClient(url, key, "memory");
         const res = await testCloudConnection(probe, url);
         el.className = "conn-status " + (res.ok ? "good" : "bad");
         el.textContent = res.summary;
@@ -2060,7 +2090,7 @@
         const btn = $("acctCfgSave");
         btn.disabled = true;
         try {
-          const probe = window.supabase.createClient(url, key);
+          const probe = newClient(url, key, "session");
           const res = await testCloudConnection(probe, url);
           if (!res.ok) throw new Error(res.summary);
           localStorage.setItem(CFG_KEY, JSON.stringify({ url, key }));

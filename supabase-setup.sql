@@ -1,5 +1,16 @@
 -- StockPilot cloud setup — run this ONCE in your Supabase project.
 -- Supabase dashboard → SQL Editor → New query → paste this whole file → Run.
+-- SAFE TO RE-RUN: every statement below is idempotent (tables IF NOT EXISTS,
+-- constraints checked before adding, policies dropped before recreating).
+--
+-- Security model (P0.3 hardening):
+--   1. Row Level Security is ENABLED and FORCED on every table — even the table
+--      owner goes through the policies (service_role still bypasses for admin).
+--   2. "Cross-ownership" policies: items / sales / chats rows must not only carry
+--      your user_id, they must point at a store YOU own — so nobody can attach
+--      orphan rows to another user's store.
+--   3. CHECK constraints reject impossible data at the database layer
+--      (negative quantities/prices, unknown sale kinds).
 
 -- Stores: each row is one physical shop belonging to one login.
 create table if not exists public.stores (
@@ -49,17 +60,88 @@ alter table public.sales add column if not exists date date;
 alter table public.sales add column if not exists custom boolean not null default false; -- per-sale custom price (chat "custom sale")
 alter table public.items add column if not exists cost numeric not null default 0;
 
--- Row Level Security: a signed-in user can only ever touch their own rows.
-alter table public.stores enable row level security;
-alter table public.items  enable row level security;
-alter table public.sales  enable row level security;
+-- ============================================================
+-- Data integrity (P0.3): reject impossible values at the DB layer.
+-- Postgres has no ADD CONSTRAINT IF NOT EXISTS, so check pg_constraint first.
+-- (Existing rows already satisfy these — the app clamps all numbers ≥ 0.)
+-- ============================================================
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'items_qty_nonneg') then
+    alter table public.items add constraint items_qty_nonneg check (qty >= 0);
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'items_price_nonneg') then
+    alter table public.items add constraint items_price_nonneg check (price >= 0);
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'items_cost_nonneg') then
+    alter table public.items add constraint items_cost_nonneg check (cost >= 0);
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'items_threshold_nonneg') then
+    alter table public.items add constraint items_threshold_nonneg check (threshold >= 0);
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'sales_qty_nonneg') then
+    alter table public.sales add constraint sales_qty_nonneg check (qty >= 0);
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'sales_price_nonneg') then
+    alter table public.sales add constraint sales_price_nonneg check (price >= 0);
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'sales_kind_valid') then
+    alter table public.sales add constraint sales_kind_valid check (kind in ('sale','use'));
+  end if;
+end $$;
 
+-- ============================================================
+-- Row Level Security (P0.3): enabled AND FORCED on every table.
+-- FORCE applies the policies even to the table owner; Supabase's
+-- service_role keeps bypassing via BYPASSRLS for admin operations.
+-- ============================================================
+alter table public.stores enable row level security;
+alter table public.stores force  row level security;
+alter table public.items  enable row level security;
+alter table public.items  force  row level security;
+alter table public.sales  enable row level security;
+alter table public.sales  force  row level security;
+
+-- Policies are dropped and recreated so re-running this file always installs
+-- the hardened definitions (drop if exists keeps it idempotent).
+
+drop policy if exists "own stores" on public.stores;
 create policy "own stores" on public.stores
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- items / sales: the row must belong to the user AND sit in a store the same
+-- user owns (cross-ownership — blocks attaching rows to someone else's store).
+drop policy if exists "own items" on public.items;
 create policy "own items" on public.items
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  for all using (
+    auth.uid() = user_id
+    and exists (
+      select 1 from public.stores s
+      where s.id = items.store_id and s.user_id = auth.uid()
+    )
+  ) with check (
+    auth.uid() = user_id
+    and exists (
+      select 1 from public.stores s
+      where s.id = items.store_id and s.user_id = auth.uid()
+    )
+  );
+
+drop policy if exists "own sales" on public.sales;
 create policy "own sales" on public.sales
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  for all using (
+    auth.uid() = user_id
+    and exists (
+      select 1 from public.stores s
+      where s.id = sales.store_id and s.user_id = auth.uid()
+    )
+  ) with check (
+    auth.uid() = user_id
+    and exists (
+      select 1 from public.stores s
+      where s.id = sales.store_id and s.user_id = auth.uid()
+    )
+  );
 
 -- Assistant conversation, one row per store (so it follows the user across devices).
 create table if not exists public.chats (
@@ -70,5 +152,21 @@ create table if not exists public.chats (
   updated_at timestamptz not null default now()
 );
 alter table public.chats enable row level security;
+alter table public.chats force  row level security;
+
+-- chats: same cross-ownership rule as items/sales.
+drop policy if exists "own chats" on public.chats;
 create policy "own chats" on public.chats
-  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  for all using (
+    auth.uid() = user_id
+    and exists (
+      select 1 from public.stores s
+      where s.id = chats.store_id and s.user_id = auth.uid()
+    )
+  ) with check (
+    auth.uid() = user_id
+    and exists (
+      select 1 from public.stores s
+      where s.id = chats.store_id and s.user_id = auth.uid()
+    )
+  );
