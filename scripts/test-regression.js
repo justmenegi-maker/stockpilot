@@ -269,6 +269,38 @@ try {
   check("custom report via dates", /detailed report/.test(handleCommand("report from 2026-09-01 to 2026-09-05") || ""), handleCommand("report from 2026-09-01 to 2026-09-05"));
   check("profit", /Profit/.test(handleCommand("profit this week") || ""));
 
+  console.log("\n— Multi add (batch) —");
+  {
+    const itemsBefore = state.items.length;
+    const reply = handleCommand("multi add 1 vivo y18 @ 1800, 1 xts @ 599, 9 yxc @ 799") || "";
+    check("multi add creates all items", state.items.length === itemsBefore + 3, `reply=${reply}`);
+    const vivo = state.items.find((it) => /vivo/i.test(it.name));
+    const xts = state.items.find((it) => /xts/i.test(it.name));
+    const yxc = state.items.find((it) => /yxc/i.test(it.name));
+    check("multi add sets qty+price per entry", !!vivo && !!xts && !!yxc && vivo.qty === 1 && vivo.price === 1800 && xts.qty === 1 && xts.price === 599 && yxc.qty === 9 && yxc.price === 799,
+      JSON.stringify([vivo, xts, yxc]));
+    check("multi add reply lists each line", /vivo y18/i.test(reply) && /xts/i.test(reply) && /yxc/i.test(reply) && /Added 3 items/.test(reply), reply);
+    check("multi add counts units", /11 units/.test(reply), reply);
+    // Restock path: existing item merges and price updates instead of duplicating.
+    const xtsBefore = xts.qty;
+    const reply2 = handleCommand("multi add 1 xts @ 649, 2 nova 5g @ 999") || "";
+    check("multi add restocks existing + creates new", state.items.length === itemsBefore + 4 && xts.qty === xtsBefore + 1 && xts.price === 649, `reply=${reply2}`);
+    // Thousands separator inside a price must not split the entry.
+    const reply3 = handleCommand("multi add 1 pro max @ 1,499") || "";
+    const proMax = state.items.find((it) => /pro max/i.test(it.name));
+    check("multi add keeps 1,499 as one price", !!proMax && proMax.price === 1499 && !/Skipped/.test(reply3), `reply=${reply3}`);
+    // Garbage lines are skipped with a helpful note; good lines still land.
+    const reply4 = handleCommand("multi add 2 good item @ 50, oops no price here") + "";
+    check("multi add skips unreadable lines", !!(state.items.find((it) => /good item/i.test(it.name))) && /Skipped 1/.test(reply4), `reply=${reply4}`);
+    check("multi add with nothing readable explains format", /couldn't read/i.test(handleCommand("multi add hello world") + ""));
+    // Junk in the middle: valid entries around it still land.
+    const before5 = state.items.length;
+    const reply5 = handleCommand("multi add 2 good item @ 50, and some glue, 3 also good @ 70") + "";
+    // "Good Item" already exists from the prior check -> it restocks (no new row);
+    // "Also Good" is new. Exactly one junk line ("and some glue") is skipped.
+    check("multi add survives mid-list junk", state.items.length === before5 + 1 && !!(state.items.find((it) => /also good/i.test(it.name))) && /Skipped 1/.test(reply5) && /glue/.test(reply5), JSON.stringify(reply5));
+  }
+
   console.log("\n— Reports panel —");
   check("resetReports defined", typeof resetReports === "function");
   check("renderReportPanel defined", typeof renderReportPanel === "function");
@@ -523,6 +555,13 @@ try {
   check("mobile: safe-area padding on header, chat, FAB and Add Item", /env\(safe-area-inset-top/.test(html) && /env\(safe-area-inset-bottom/.test(html));
   check("mobile: icon-only secondary header buttons (4 labels)", (html.match(/class="btn-label"/g) || []).length === 4 && /\.btn-label \{ display: none; \}/.test(html));
   check("mobile: dialog buttons full-width 44px targets", /\.dialog-actions \.btn \{ flex: 1 1 auto; justify-content: center; min-height: 44px; \}/.test(html));
+  check("multi add command is routed + documented", scripts[0].includes("multi\\s*[- ]?add") && /multi add 1 vivo y18/.test(scripts[0]));
+  check("multi add: comma split guards thousands separators", scripts[0].includes("split(/\\s*,\\s*(?=\\d+\\s+\\S)/)"));
+  check("mobile: toolbar becomes 2-col grid, search full-width", html.includes(".toolbar { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }") && html.includes(".toolbar .search { grid-column: 1 / -1; min-width: 0; }"));
+  check("mobile: report text capped & scrollable", html.includes(".rp-report { max-height: 40dvh; overflow-y: auto;"));
+  check("mobile: dialog field rows stack", html.includes(".dialog-body .field-row { display: block; }"));
+  check("mobile: toasts clear the floating pills", html.includes("#toastWrap { bottom: calc(140px + env(safe-area-inset-bottom, 0px));"));
+  check("mobile: auth tabs 40px targets", html.includes(".auth-tabs button { min-height: 40px; }"));
 } catch (e) {
   failed++;
   console.error("❌ Harness error:", e.stack || e);
