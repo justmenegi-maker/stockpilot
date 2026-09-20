@@ -17,20 +17,20 @@
         --panel: #ffffff;
         --ink: #0f172a;
         --muted: #64748b;
-        --line: #e2e8f0;
+        --line: #e9edf3;
         --brand: #4f46e5;
         --brand-ink: #ffffff;
         --ok: #16a34a;
         --warn: #b45309;
         --danger: #dc2626;
-        --radius: 14px;
+        --radius: 12px;
       }
       [data-theme="dark"] {
         --bg: #0b1220;
         --panel: #111a2e;
         --ink: #e2e8f0;
         --muted: #94a3b8;
-        --line: #1e293b;
+        --line: #22304a;
         --brand: #818cf8;
         --brand-ink: #0b1220;
         --ok: #4ade80;
@@ -53,7 +53,7 @@
         display: flex;
         align-items: center;
         gap: 12px;
-        padding: 12px clamp(12px, 3vw, 24px);
+        padding: 10px clamp(12px, 3vw, 24px);
         background: var(--panel);
         border-bottom: 1px solid var(--line);
         flex-wrap: wrap;
@@ -70,7 +70,7 @@
         width: 30px;
         height: 30px;
         border-radius: 9px;
-        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        background: var(--brand);
         display: grid;
         place-items: center;
         color: white;
@@ -97,30 +97,35 @@
       .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 16px; }
       @media (max-width: 760px) { .stats { grid-template-columns: repeat(2, 1fr); } }
       .stat {
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: var(--radius);
-        padding: 14px 16px;
+        background: transparent;
+        border: none;
+        border-radius: 0;
+        padding: 6px 8px;
         display: flex;
         flex-direction: column;
         gap: 4px;
       }
-      .stat .label { font-size: 11px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+      .stat .label { font-size: 12px; color: var(--muted); font-weight: 600; }
+      .stat-btn { text-align: left; font: inherit; cursor: pointer; }
+      .stat-btn:hover .value { color: var(--brand); }
+      .stat-btn .stat-hint { display: none; font-size: 11px; color: var(--brand); font-weight: 600; }
+      .stat-btn:hover .stat-hint { display: inline; }
       .stat .value { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
       .sold-section { margin-bottom: 16px; }
       .sold-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
       .sold-head h3 { margin: 0; font-size: 15px; }
-      .sold-list { display: flex; flex-direction: column; gap: 6px; }
+      .sold-list { display: flex; flex-direction: column; }
       .sold-row {
         display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-        background: var(--panel); border: 1px solid var(--line);
-        border-radius: 10px; padding: 8px 12px; font-size: 13.5px;
+        background: transparent; border: none; border-bottom: 1px solid var(--line);
+        border-radius: 0; padding: 10px 2px; font-size: 13.5px;
       }
+      .sold-row:last-child { border-bottom: none; }
       .sold-row .s-name { font-weight: 700; }
       .sold-row .s-price { font-variant-numeric: tabular-nums; }
       .sold-row .s-tag {
-        font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em;
-        padding: 2px 7px; border-radius: 999px;
+        font-size: 11px; font-weight: 700;
+        padding: 2px 8px; border-radius: 999px;
         background: color-mix(in srgb, var(--brand) 14%, transparent); color: var(--brand);
       }
       .sold-empty { color: var(--muted); font-size: 13px; padding: 6px 2px; }
@@ -142,11 +147,12 @@
         display: flex;
         align-items: center;
         gap: 8px;
-        background: var(--panel);
-        border: 1px solid var(--line);
+        background: color-mix(in srgb, var(--ink) 4%, transparent);
+        border: 1px solid transparent;
         border-radius: var(--radius);
         padding: 0 12px;
       }
+      .search:focus-within { border-color: color-mix(in srgb, var(--brand) 45%, transparent); background: var(--panel); }
       .search input {
         flex: 1;
         border: none;
@@ -170,17 +176,17 @@
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        border: 1px solid var(--line);
-        background: var(--panel);
+        border: 1px solid transparent;
+        background: color-mix(in srgb, var(--ink) 5%, transparent);
         color: var(--ink);
         border-radius: var(--radius);
         padding: 10px 14px;
         font-size: 14px;
         font-weight: 600;
         cursor: pointer;
-        transition: transform 0.05s, border-color 0.15s;
+        transition: transform 0.05s, background 0.15s;
       }
-      .btn:hover { border-color: var(--brand); }
+      .btn:hover { background: color-mix(in srgb, var(--ink) 9%, transparent); }
       .btn:active { transform: scale(0.97); }
       .btn.primary { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
       .btn.primary:hover { filter: brightness(1.08); }
@@ -213,9 +219,9 @@
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        font-size: 12px;
+        font-size: 11.5px;
         font-weight: 700;
-        padding: 4px 10px;
+        padding: 3px 9px;
         border-radius: 999px;
         white-space: nowrap;
       }
@@ -229,7 +235,7 @@
       .qty-controls .btn { padding: 5px 10px; border-radius: 9px; font-size: 13px; }
       .row-actions { display: flex; gap: 2px; justify-content: flex-end; }
       .empty { padding: 48px 16px; text-align: center; color: var(--muted); }
-      .empty .big { font-size: 34px; margin-bottom: 8px; }
+      .empty .big { font-size: 30px; margin-bottom: 8px; opacity: 0.85; }
       .fab-chat {
         position: fixed;
         right: 18px;
@@ -239,7 +245,9 @@
         height: 56px;
         border-radius: 999px;
         border: none;
-        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        background: var(--brand);
+        color: var(--brand-ink);
+        background: var(--brand);
         color: white;
         font-size: 24px;
         cursor: pointer;
@@ -276,7 +284,7 @@
       }
       .chat-head .avatar {
         width: 34px; height: 34px; border-radius: 10px;
-        background: linear-gradient(135deg, #6366f1, #8b5cf6);
+        background: var(--brand);
         display: grid; place-items: center; color: white; font-size: 17px;
         flex-shrink: 0;
       }
@@ -331,7 +339,7 @@
       }
       dialog::backdrop { background: rgba(2, 6, 23, 0.5); }
       .dialog-body { padding: 20px; max-height: calc(100vh - 48px); overflow-y: auto; }
-      .dialog-body h3 { margin: 0 0 4px; font-size: 17px; letter-spacing: -0.01em; }
+      .dialog-body h3 { margin: 0 0 4px; font-size: 16px; letter-spacing: -0.01em; }
       .dialog-body p { margin: 0 0 16px; font-size: 13px; color: var(--muted); }
       .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; flex: 1; }
       .field label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
@@ -466,18 +474,18 @@
       .overview-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 4px 0 14px; flex-wrap: wrap; }
       .overview-head h2 { margin: 0; font-size: 20px; letter-spacing: -0.02em; }
       .stores-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; margin-bottom: 16px; }
-      .store-card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; cursor: pointer; transition: transform 0.05s, border-color 0.15s; text-align: left; }
-      .store-card:hover { border-color: var(--brand); }
+      .store-card { background: color-mix(in srgb, var(--ink) 3%, transparent); border: 1px solid transparent; border-radius: var(--radius); padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; cursor: pointer; transition: transform 0.05s, background 0.15s; text-align: left; }
+      .store-card:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); }
       .store-card:active { transform: scale(0.98); }
       .store-card .sc-top { display: flex; align-items: center; gap: 10px; }
-      .store-card .sc-emoji { width: 34px; height: 34px; border-radius: 10px; background: linear-gradient(135deg, #6366f1, #8b5cf6); display: grid; place-items: center; color: white; font-size: 16px; flex-shrink: 0; }
+      .store-card .sc-emoji { width: 34px; height: 34px; border-radius: 10px; background: var(--brand); display: grid; place-items: center; color: white; font-size: 16px; flex-shrink: 0; }
       .store-card .sc-name { font-weight: 800; font-size: 15px; letter-spacing: -0.01em; }
       .store-card .sc-cur { font-size: 11px; color: var(--muted); font-weight: 700; }
       .store-card .sc-del { margin-left: auto; }
       .store-card .sc-stats { display: flex; gap: 14px; }
       .store-card .sc-stat { display: flex; flex-direction: column; gap: 1px; }
       .store-card .sc-stat b { font-size: 17px; font-variant-numeric: tabular-nums; }
-      .store-card .sc-stat span { font-size: 10px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+      .store-card .sc-stat span { font-size: 11.5px; color: var(--muted); font-weight: 600; }
       .store-card .sc-stat b.warn { color: var(--warn); }
       .store-card .sc-stat b.danger { color: var(--danger); }
 
@@ -554,8 +562,8 @@
         main { padding: 12px 12px 120px; }
 
         /* Stats: two tidy columns. */
-        .stats { grid-template-columns: repeat(2, 1fr); gap: 8px; }
-        .stat { padding: 12px; border-radius: 12px; }
+        .stats { grid-template-columns: repeat(2, 1fr); gap: 4px 8px; }
+        .stat { padding: 8px 4px; }
         .stat .value { font-size: 20px; }
 
         /* Inventory table: roomier rows, narrower gutter, always scrollable. */
@@ -566,7 +574,8 @@
         .qty-controls .btn { padding: 6px 12px; font-size: 13px; min-height: 32px; }
         .row-actions .btn.icon { min-width: 36px; min-height: 34px; display: inline-flex; align-items: center; justify-content: center; }
 
-        /* Sold-today rows wrap instead of overflowing. */
+        /* Sold-today rows: dividers stay readable on small screens. */
+        .sold-row { padding: 10px 0; }
 
         /* Dialogs and auth card: edge-to-edge with breathing room, no cut-offs. */
         dialog { width: calc(100vw - 16px); max-height: calc(100dvh - 24px); }
@@ -655,7 +664,7 @@
       <!-- All-stores overview: a page per store, with live stock/sales stats and quick open. -->
       <div id="overview" style="display:none">
         <div class="overview-head">
-          <h2>🏬 All Stores</h2>
+          <h2>All stores</h2>
           <div class="header-actions">
             <button class="btn" id="storeCreate">＋ New Store</button>
             <button class="btn primary" id="overviewClose">Back to stock</button>
@@ -671,7 +680,7 @@
         <div class="stat"><span class="label">Units in Stock</span><span class="value" id="statUnits">0</span></div>
         <div class="stat"><span class="label">Stock Value</span><span class="value" id="statValue">$0</span></div>
         <div class="stat"><span class="label">Low / Out of Stock</span><span class="value danger" id="statLow">0</span></div>
-        <div class="stat" id="statSoldCard" title="Click to edit today's sales" style="cursor:pointer"><span class="label">Sold Today</span><span class="value ok" id="statSoldToday">0</span></div>
+        <button class="stat stat-btn" id="statSoldCard" title="Edit today's sales"><span class="label">Sold today</span><span class="value ok" id="statSoldToday">0</span><span class="stat-hint">edit →</span></button>
         <div class="stat"><span class="label">Store Use Today</span><span class="value" id="statUseToday">0</span></div>
       </div>
 
@@ -680,7 +689,7 @@
            a row puts the units back into stock. -->
       <div class="sold-section" id="soldSection">
         <div class="sold-head">
-          <h3>🧾 Sold Today</h3>
+          <h3>Sold today</h3>
           <button class="btn ghost" id="editSaleBtn" title="Edit or delete today's sales">✏️ Edit sales</button>
         </div>
         <div class="sold-list" id="soldList"></div>
@@ -703,7 +712,7 @@
       <!-- Reports: daily / weekly / monthly presets plus any custom date range. -->
       <div class="reports">
         <div class="reports-head">
-          <h3>📊 Sales reports</h3>
+          <h3>Sales reports</h3>
           <div class="rp-seg" id="rpSeg">
             <button data-span="day" class="active">Daily</button>
             <button data-span="week">Weekly (7d)</button>
