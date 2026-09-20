@@ -308,7 +308,7 @@ try {
     const prev = els.rpOutput.innerHTML;
     renderReportPanel();
     check("panel renders into #rpOutput", els.rpOutput.innerHTML !== prev || els.rpOutput.textContent.length > 0);
-    check("panel text has sales totals", /detailed report/.test(els.rpOutput.textContent) && /Sold:/.test(els.rpOutput.textContent), els.rpOutput.textContent.slice(0, 120));
+    check("panel text has sales totals", /Items sold/.test(els.rpOutput.innerHTML) && /revenue/i.test(els.rpOutput.innerHTML), els.rpOutput.innerHTML.slice(0, 160));
   }
 
   console.log("\n— Store switching —");
@@ -439,8 +439,8 @@ try {
 
   // Panel shows the same detail as chat.
   app.resetReports();
-  check("panel shows store use section", /Store use \(not sales\)/.test(els.rpOutput.textContent), els.rpOutput.textContent.slice(0, 200));
-  check("panel shows custom section", /Custom sales \(separate\)/.test(els.rpOutput.textContent));
+  check("panel shows store use section", /Store use \(not sales\)/.test(els.rpOutput.innerHTML), els.rpOutput.innerHTML.slice(0, 200));
+  check("panel shows custom section", /Custom sales \(separate\)/.test(els.rpOutput.innerHTML));
 
   // C) Edit sale: qty/price rewrite keeps stock; delete returns units to stock.
   const hBefore = state.items.find((it) => /hammer/i.test(it.name)).qty;
@@ -555,6 +555,13 @@ try {
   check("UI: stat numbers are unboxed", /\.stat \{\s*\n\s*background: transparent;\s*\n\s*border: none;/.test(html));
   check("UI: sold list uses dividers, not cards", /border-bottom: 1px solid var\(--line\);\s*\n\s*border-radius: 0;/.test(html) && /\.sold-row:last-child \{ border-bottom: none; \}/.test(html));
   check("UI: section titles are sentence case", html.includes("<h2>All stores</h2>") && html.includes("<h3>Sold today</h3>") && html.includes("<h3>Sales reports</h3>"));
+  // ---- Detailed report tables ----
+  check("reports: ruled table styles present", /table\.rp-table/.test(html) && /\.rp-table tfoot td \{\s*\n\s*border-top: 2px solid var\(--line\);/.test(html));
+  check("reports: summary KPI strip", /\.rp-summary \{/.test(html) && /kpiHtml\(/.test(scripts[0]));
+  check("reports: per-item columns qty/revenue/avg/share", /Avg price/.test(scripts[0]) && /share-bar/.test(scripts[0]));
+  check("reports: totals footer rows built", scripts[0].includes("<tfoot>") && (scripts[0].match(/<\/tfoot>/g) || []).length === 3);
+  check("reports: custom + store-use tables", /Custom sales \(separate\)/.test(scripts[0]) && /Store use \(not sales\)/.test(scripts[0]));
+  check("reports: chat keeps plain text", /detailed report:/.test(scripts[0]));
   check("UI: sold-today stat is an edit button with affordance", /class="stat stat-btn"/.test(html) && /stat-hint/.test(html));
   check("document has a <title>", /<title>[^<]+<\/title>/.test(html) && /StockPilot/.test((html.match(/<title>([^<]*)<\/title>/) || [])[1] || ""));
   check("viewport has viewport-fit=cover for safe-area insets", /content="width=device-width, initial-scale=1, viewport-fit=cover"/.test(html));
