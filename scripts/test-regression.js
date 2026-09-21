@@ -26,6 +26,9 @@ function makeEl(tag) {
       toggle(c, on) { on === undefined ? (this._s.has(c) ? this._s.delete(c) : this._s.add(c)) : on ? this._s.add(c) : this._s.delete(c); },
       contains(c) { return this._s.has(c); },
     },
+    _attrs: {},
+    setAttribute(k, v) { this._attrs[k] = String(v); },
+    getAttribute(k) { return k in this._attrs ? this._attrs[k] : null; },
     textContent: "",
     innerHTML: "",
     value: "",
@@ -199,6 +202,8 @@ const documentObj = {
   body: makeEl("body"),
 };
 
+els.reportsSection.style.display = "none"; // markup ships with style="display:none"
+
 const sandbox = {
   console,
   setTimeout: (fn) => { fn(); return 0; },
@@ -207,10 +212,14 @@ const sandbox = {
   localStorage: storageFactory(store),
   sessionStorage: storageFactory(session),
   document: documentObj,
+  Blob: function (parts, opts) { return { parts, opts, size: (parts[0] || "").length }; },
   window: {},
   Date,
   Math,
-  URL,
+  URL: class extends URL {
+    static createObjectURL(blob) { sandbox.__lastBlob = blob; return "blob:mock-url"; }
+    static revokeObjectURL() {}
+  },
   JSON,
   Map,
   Set,
@@ -242,7 +251,7 @@ function check(name, cond, extra) {
 // appended to the app source before it runs. The script must be evaluated exactly
 // once in this context — a second run would redeclare its top-level consts.
 sandbox.__capture = null;
-const epilogue = `;__capture = { state, handleCommand, localStores, showView, resetReports, renderReportPanel, uiView: () => uiView, createStoreOffline, loadOfflineStore, runAutoPrune, pruneStateSales, pruneCutoffDate, RETENTION_DAYS, salesBreakdown, isCustomSale, saveSalesEdit, deleteSaleRow, renderSoldList, renderSoldEditor, openSold, recordMovement, takeStock, adjustQty, reportText, acctOpen, acctFillProfile, testCloudConnection, friendlyAuthError, acctDlg: () => acctDlg, showPending, setAuthMode, afterSignIn, authMode: () => authMode };`;
+const epilogue = `;__capture = { state, handleCommand, localStores, showView, resetReports, renderReportPanel, uiView: () => uiView, createStoreOffline, loadOfflineStore, runAutoPrune, pruneStateSales, pruneCutoffDate, RETENTION_DAYS, salesBreakdown, isCustomSale, saveSalesEdit, deleteSaleRow, renderSoldList, renderSoldEditor, openSold, recordMovement, exportCsv, takeStock, adjustQty, reportText, acctOpen, acctFillProfile, testCloudConnection, friendlyAuthError, acctDlg: () => acctDlg, showPending, setAuthMode, afterSignIn, authMode: () => authMode };`;
 try {
   vm.runInContext(scripts[0] + epilogue, sandbox, { filename: "index.html:inline+epilogue" });
 } catch (e) {
@@ -250,7 +259,7 @@ try {
   process.exit(1);
 }
 const app = sandbox.__capture;
-const { state, handleCommand, localStores, showView, resetReports, renderReportPanel } = app;
+const { state, handleCommand, localStores, showView, resetReports, renderReportPanel, exportCsv } = app;
 
 // The app's prune promise chains are simple resolve queues; a short synchronous
 // busy-wait lets the vm's microtask queue run between synchronous calls.
@@ -305,6 +314,42 @@ try {
     // "Good Item" already exists from the prior check -> it restocks (no new row);
     // "Also Good" is new. Exactly one junk line ("and some glue") is skipped.
     check("multi add survives mid-list junk", state.items.length === before5 + 1 && !!(state.items.find((it) => /also good/i.test(it.name))) && /Skipped 1/.test(reply5) && /glue/.test(reply5), JSON.stringify(reply5));
+  }
+
+  console.log("\n— Reports & data (PR #21) —");
+  {
+    const t = els.reportsToggle, sec = els.reportsSection;
+    check("toggle: exactly one click listener", ((t._ls || {}).click || []).length === 1);
+    t.click();
+    const opened = sec.style.display === "" && t.getAttribute("aria-expanded") === "true" && t.classList.contains("open");
+    t.click();
+    const closed = sec.style.display === "none" && t.getAttribute("aria-expanded") === "false" && !t.classList.contains("open");
+    check("toggle: open->close flips display + aria + chevron", opened && closed, JSON.stringify({ opened, closed }));
+    t.click();
+    check("toggle: re-open works after close", sec.style.display === "" && t.getAttribute("aria-expanded") === "true");
+    const rendered = /Items sold|No sales|Total|revenue/i.test(els.rpOutput.innerHTML) || els.rpOutput.innerHTML.length > 0;
+    check("toggle: opening renders report content", rendered);
+    t.click();
+    els.rpOutput.innerHTML = ""; // keep the later "Reports panel" section's change-detection intact
+
+    // CSV: capture the anchor and the blob text the app generates
+    const realCreate = documentObj.createElement;
+    let anchor = null;
+    documentObj.createElement = (tag) => {
+      const el = realCreate(tag);
+      if (tag === "a") { el.click = () => { anchor = el; }; el.remove = noop; }
+      return el;
+    };
+    if (state.items.length === 0) createItem("CSV Item", 3, 12.5);
+    exportCsv();
+    documentObj.createElement = realCreate;
+    const blob = sandbox.__lastBlob;
+    const text = blob && blob.parts ? String(blob.parts[0]) : "";
+    check("csv: download anchor clicked", !!anchor);
+    check("csv: object URL + per-store filename", /blob:/.test(String(anchor && anchor.href)) && /^stockpilot-[\w-]+-\d{4}-\d{2}-\d{2}\.csv$/.test(String(anchor && anchor.download)), JSON.stringify(anchor && anchor.download));
+    check("csv: BOM + header row + quoted fields", text.startsWith("\ufeff") && text.includes('"Name","Category","Qty","Unit price","Unit cost","Stock value","Alert at"'), JSON.stringify(text.slice(0, 80)));
+    const csvItem = state.items.find((it) => it.name === "CSV Item");
+    check("csv: item row lands in the output", !csvItem || text.includes('"CSV Item"'), JSON.stringify(text.slice(0, 120)));
   }
 
   console.log("\n— Reports panel —");
