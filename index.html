@@ -3090,14 +3090,15 @@
           },
         },
         {
-          help: '• "delete all" — wipe every item (asks to confirm)',
-          match: (x, t) => /^(?:delete|del|remove|clear|wipe)\s+(?:all|everything|the whole inventory|entire inventory)$|^clear inventory$/.test(t),
+          help: '• "delete all stock" — wipe every item in this store (asks to confirm)',
+          match: (x, t) => /^(?:delete|del|remove|clear|wipe)\s+(?:all(?:\s+(?:stock|items?|inventory))?|everything|all\s+(?:of\s+)?(?:the\s+)?(?:stock|items?|inventory)|(?:the\s+)?(?:whole|entire)\s+(?:inventory|stock))$|^clear\s+inventory$/.test(t),
           run: () => {
             if (!state.items.length) return "Inventory is already empty — nothing to delete.";
-            return confirmFirst(`Delete ALL ${state.items.length} items? This cannot be undone.`, () => {
+            const units = state.items.reduce((n, it) => n + (it.qty || 0), 0);
+            return confirmFirst(`Delete ALL ${state.items.length} items (${units} units)? This cannot be undone.`, () => {
               const ids = state.items.map((it) => it._id);
               for (const id of ids) removeItem(id);
-              return `🗑️ Deleted all ${ids.length} items.`;
+              return `🗑️ Deleted all ${ids.length} items. Inventory is now empty.`;
             });
           },
         },
