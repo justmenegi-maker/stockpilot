@@ -327,6 +327,40 @@ try {
     return arr.some((it) => /pens/i.test(it.name || ""));
   })(), "local-default.items missing pens");
 
+  console.log("\n— Delete all stock —");
+  {
+    // On the empty "Second Shop": nothing to delete and nothing gets armed.
+    const emptyReply = handleCommand("delete all stock") || "";
+    check("delete all stock on empty inventory is a no-op", /already empty/.test(emptyReply), emptyReply);
+
+    handleCommand("add 5 test alpha");
+    handleCommand("add 3 test beta");
+    check("seeded two items for wipe test", state.items.length === 2, `items=${state.items.length}`);
+
+    // Destructive command arms a confirmation instead of deleting outright.
+    const armReply = handleCommand("delete all stock") || "";
+    check("delete all stock asks to confirm with counts", /Delete ALL 2 items \(8 units\)/.test(armReply) && /cannot be undone/i.test(armReply), armReply);
+    check("nothing deleted while unconfirmed", state.items.length === 2, `items=${state.items.length}`);
+
+    // The gate holds until a clear yes/no; unrelated text must not trip it.
+    const holdReply = handleCommand("something random") || "";
+    check("confirmation gate holds on unrelated text", /Still waiting/.test(holdReply), holdReply);
+    check("still nothing deleted after gate holds", state.items.length === 2);
+    check("cancel keeps stock intact", /Cancelled/.test(handleCommand("nope") || "") && state.items.length === 2);
+
+    // Legacy phrase still routes; confirming executes the wipe.
+    const arm2 = handleCommand("delete all") || "";
+    check("legacy 'delete all' also routes", /Delete ALL 2 items/.test(arm2), arm2);
+    const wipeReply = handleCommand("yes") || "";
+    check("confirming wipes every item", state.items.length === 0, `reply=${wipeReply}`);
+    check("wipe reply counts deleted items", /Deleted all 2 items/.test(wipeReply), wipeReply);
+    const stored = store.get("stockpilot.local." + state.storeId + ".items");
+    check("wipe persists to storage", stored === "[]", String(stored));
+
+    // Help documents the command.
+    check("help lists delete all stock", /delete all stock/.test(handleCommand("help") || ""));
+  }
+
   console.log("\n— Overview —");
   showView("overview");
   check("overview page shows", app.uiView() === "overview");
