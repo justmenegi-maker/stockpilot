@@ -81,6 +81,9 @@ const els = {
   rpTo: makeEl("input"),
   rpApply: makeEl("button"),
   rpOutput: makeEl("div"),
+  reportsToggle: makeEl("button"),
+  reportsSection: makeEl("div"),
+  exportBtn: makeEl("button"),
   tbody: makeEl("tbody"),
   emptyState: makeEl("div"),
   chatFab: makeEl("button"),
@@ -622,12 +625,22 @@ try {
   check("UI: auth/account headings are plain text (no emoji)", /<h2 id="authTitle">Sign in to StockPilot<\/h2>/.test(html) && /<h3 id="acctTitle">Account settings<\/h3>/.test(html));
   check("UI: search input has no decorative emoji", !/<div class="search">🔎/.test(html));
   check("UI: secondary header actions are icon-only on desktop too", /\.header-actions \.btn-label \{ display: none; \}/.test(html));
+
+  // ---- Reports hidden behind toggle + CSV export + SVG icons ----
+  check("reports: hidden by default behind a toggle button", /id="reportsSection" style="display:none"/.test(html) && /id="reportsToggle"/.test(html) && /aria-expanded="false"/.test(html));
+  check("reports: toggle opens panel + syncs aria-expanded", /reportsToggle/.test(scripts[0]) && /setAttribute\("aria-expanded"/.test(scripts[0]) && /btn\.classList\.toggle\("open"/.test(scripts[0]));
+  check("data: CSV export wired (quotes fields, BOM, per-store filename)", /function exportCsv/.test(scripts[0]) && /text\/csv/.test(scripts[0]) && /\\uFEFF/.test(scripts[0]) && /stockpilot-/.test(scripts[0]));
+  check("icons: inline SVG sprite present (CSP-safe)", /<symbol id="i-plus"/.test(html) && /<symbol id="i-chat"/.test(html) && /<symbol id="i-download"/.test(html));
+  check("icons: header + FAB chrome use SVG (emoji only in toast text)", /<use href="#i-cloud"\/>/.test(html) && /fab-chat" id="chatFab"[\s\S]{0,120}#i-chat/.test(html) && !/💬|☁️|🚪|👤|🏬|🌙/.test(html.split("<script>")[0]));
+  check("icons: theme toggle swaps sun/moon via innerHTML", /#i-sun/.test(scripts[0]) && /#i-moon/.test(scripts[0]) && /innerHTML = dark/.test(scripts[0]));
+  check("icons: table row actions are SVG edit/trash", /data-act="edit" data-id="\$\{esc\(it\._id\)\}" title="Edit" aria-label/.test(scripts[0]) && /data-act="del"[\s\S]{0,120}#i-trash/.test(scripts[0]));
+  check("icons: alert badge uses bell SVG", /badge\.innerHTML = `<svg class="ic"[\s\S]{0,60}#i-bell/.test(scripts[0]));
   check("document has a <title>", /<title>[^<]+<\/title>/.test(html) && /StockPilot/.test((html.match(/<title>([^<]*)<\/title>/) || [])[1] || ""));
   check("viewport has viewport-fit=cover for safe-area insets", /content="width=device-width, initial-scale=1, viewport-fit=cover"/.test(html));
   check("mobile CSS layer exists (760px breakpoints)", (html.match(/@media \(max-width: 760px\)/g) || []).length >= 2);
   check("mobile: 16px inputs prevent iOS focus zoom", /font-size: 16px; \/\* prevents iOS focus zoom \*\//.test(html) && /\.field input, \.field select, \.field textarea \{ font-size: 16px; \}/.test(html));
   check("mobile: safe-area padding on header, chat, FAB and Add Item", /env\(safe-area-inset-top/.test(html) && /env\(safe-area-inset-bottom/.test(html));
-  check("mobile: icon-only secondary header buttons (4 labels)", (html.match(/class="btn-label"/g) || []).length === 4 && /\.btn-label \{ display: none; \}/.test(html));
+  check("mobile: icon-only secondary header buttons (4 labels)", (html.match(/class="btn-label"/g) || []).length === 5 && /\.btn-label \{ display: none; \}/.test(html));
   check("mobile: dialog buttons full-width 44px targets", /\.dialog-actions \.btn \{ flex: 1 1 auto; justify-content: center; min-height: 44px; \}/.test(html));
   check("multi add command is routed + documented", scripts[0].includes("multi\\s*[- ]?add") && /multi add 1 vivo y18/.test(scripts[0]));
   check("multi add: comma split guards thousands separators", scripts[0].includes("split(/\\s*,\\s*(?=\\d+\\s+\\S)/)"));

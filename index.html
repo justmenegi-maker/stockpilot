@@ -360,6 +360,19 @@
         font-size: 11px;
         font-family: inherit;
       }
+      /* Icons: inline SVG sprite (CSP-safe, theme-aware via currentColor) */
+      .ic {
+        width: 16px; height: 16px; flex-shrink: 0;
+        stroke: currentColor; fill: none; stroke-width: 2;
+        stroke-linecap: round; stroke-linejoin: round; vertical-align: -2px;
+      }
+      .btn.icon .ic { width: 17px; height: 17px; }
+      .fab-chat .ic { width: 22px; height: 22px; }
+      .reports-toggle .chev { transition: transform 0.15s; }
+      .reports-toggle.open .chev { transform: rotate(180deg); }
+      .section-actions { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+      .section-actions .btn { padding: 8px 12px; font-size: 13.5px; }
+
       /* toast */
       #toastWrap { position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%); z-index: 100; display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none; }
       .toast {
@@ -656,6 +669,9 @@
         .toolbar { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         .toolbar .search { grid-column: 1 / -1; min-width: 0; }
 
+        /* Reports/data toggle row: full-width tap targets. */
+        .section-actions .btn { flex: 1 1 auto; justify-content: center; min-height: 42px; }
+
         /* Reports: comfortable segment taps; report text scrolls, never overflows. */
         .rp-seg button { padding: 8px 10px; font-size: 12px; }
         .rp-report { max-height: 40dvh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
@@ -683,20 +699,40 @@
     </style>
   </head>
   <body>
+    <svg style="display:none" aria-hidden="true">
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+      <symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 20h18M6 20v-7M12 20V6M18 20v-10"/></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16"/></symbol>
+      <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></symbol>
+      <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5H5l-2 2V11.5A8.5 8.5 0 0 1 11.5 3h1A8.5 8.5 0 0 1 21 11.5z"/></symbol>
+      <symbol id="i-send" viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></symbol>
+      <symbol id="i-close" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></symbol>
+      <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+      <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M17.5 19a4.5 4.5 0 0 0 .3-9 6 6 0 0 0-11.6 1.6A3.8 3.8 0 0 0 6.5 19h11z"/></symbol>
+      <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 5-5.5 8-5.5s6.5 1.5 8 5.5"/></symbol>
+      <symbol id="i-stores" viewBox="0 0 24 24"><path d="M3 21h18M5 21V8l7-5 7 5v13M9 21v-6h6v6"/></symbol>
+      <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
+      <symbol id="i-edit" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></symbol>
+      <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6"/></symbol>
+      <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></symbol>
+      <symbol id="i-box" viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5v8l9 5 9-5V8zM3 8l9 5 9-5M12 13v8"/></symbol>
+    </svg>
     <header>
       <div class="logo"><div class="logo-box">📦</div> <span id="brandName">StockPilot</span></div>
       <div class="spacer"></div>
       <div class="header-actions">
-        <button class="btn ghost" id="signinBtn" title="Sign in / cloud settings" aria-label="Sign in">☁️ <span class="btn-label">Sign in</span></button>
-        <button class="btn ghost" id="accountBtn" title="Account settings" aria-label="Account" style="display:none">👤 <span class="btn-label">Account</span></button>
-        <button class="btn ghost" id="storesBtn" title="All stores overview" aria-label="Stores">🏬 <span class="btn-label">Stores</span></button>
+        <button class="btn ghost" id="signinBtn" title="Sign in / cloud settings" aria-label="Sign in"><svg class="ic"><use href="#i-cloud"/></svg> <span class="btn-label">Sign in</span></button>
+        <button class="btn ghost" id="accountBtn" title="Account settings" aria-label="Account" style="display:none"><svg class="ic"><use href="#i-user"/></svg> <span class="btn-label">Account</span></button>
+        <button class="btn ghost" id="storesBtn" title="All stores overview" aria-label="Stores"><svg class="ic"><use href="#i-stores"/></svg> <span class="btn-label">Stores</span></button>
         <select id="storeSelect" aria-label="Store" title="Store" style="display:none"></select>
-        <button class="btn ghost" id="addStoreBtn" title="Add another store" style="display:none">＋ Store</button>
-        <button class="btn ghost" id="logoutBtn" title="Sign out" aria-label="Log out" style="display:none">🚪 <span class="btn-label">Log out</span></button>
+        <button class="btn ghost" id="addStoreBtn" title="Add another store" style="display:none"><svg class="ic"><use href="#i-plus"/></svg> <span class="btn-label">Store</span></button>
+        <button class="btn ghost" id="logoutBtn" title="Sign out" aria-label="Log out" style="display:none"><svg class="ic"><use href="#i-logout"/></svg> <span class="btn-label">Log out</span></button>
         <select id="currencySelect" aria-label="Currency" title="Currency"></select>
         <button class="alert-badge" id="alertBadge" title="Show low-stock items" style="display:none"></button>
-        <button class="btn icon" id="themeBtn" title="Toggle theme">🌙</button>
-        <button class="btn primary" id="addItemBtn">+ Add Item</button>
+        <button class="btn icon" id="themeBtn" title="Toggle theme" aria-label="Toggle theme"><svg class="ic"><use href="#i-moon"/></svg></button>
+        <button class="btn primary" id="addItemBtn"><svg class="ic"><use href="#i-plus"/></svg> Add Item</button>
       </div>
     </header>
 
@@ -706,8 +742,8 @@
         <div class="overview-head">
           <h2>All stores</h2>
           <div class="header-actions">
-            <button class="btn" id="storeCreate">＋ New Store</button>
-            <button class="btn primary" id="overviewClose">Back to stock</button>
+            <button class="btn" id="storeCreate"><svg class="ic"><use href="#i-plus"/></svg> New Store</button>
+            <button class="btn primary" id="overviewClose"><svg class="ic"><use href="#i-box"/></svg> Back to stock</button>
           </div>
         </div>
         <div class="stores-grid" id="storesGrid"></div>
@@ -730,13 +766,13 @@
       <div class="sold-section" id="soldSection">
         <div class="sold-head">
           <h3>Sold today</h3>
-          <button class="btn ghost" id="editSaleBtn" title="Edit or delete today's sales">Edit sales</button>
+          <button class="btn ghost" id="editSaleBtn" title="Edit or delete today's sales"><svg class="ic"><use href="#i-edit"/></svg> Edit sales</button>
         </div>
         <div class="sold-list" id="soldList"></div>
       </div>
 
       <div class="toolbar">
-        <div class="search"><input id="searchInput" placeholder="Search items…" /></div>
+        <div class="search"><svg class="ic"><use href="#i-search"/></svg><input id="searchInput" placeholder="Search items…" /></div>
         <select id="filterSelect" aria-label="Filter">
           <option value="all">All items</option>
           <option value="low">Low stock</option>
@@ -750,7 +786,16 @@
       </div>
 
       <!-- Reports: daily / weekly / monthly presets plus any custom date range. -->
-      <div class="reports">
+      <div class="section-actions">
+        <button class="btn ghost reports-toggle" id="reportsToggle" aria-expanded="false" title="Show sales reports and data">
+          <svg class="ic"><use href="#i-chart"/></svg> Reports &amp; data <svg class="ic chev"><use href="#i-chevron"/></svg>
+        </button>
+        <button class="btn ghost" id="exportBtn" title="Download this store's inventory as CSV">
+          <svg class="ic"><use href="#i-download"/></svg> Export CSV
+        </button>
+      </div>
+
+      <div class="reports" id="reportsSection" style="display:none">
         <div class="reports-head">
           <h3>Sales reports</h3>
           <div class="rp-seg" id="rpSeg">
@@ -787,7 +832,7 @@
       </div><!-- /storeView -->
     </main>
 
-    <button class="fab-chat" id="chatFab" title="Open assistant ( / )">💬</button>
+    <button class="fab-chat" id="chatFab" title="Open assistant ( / )" aria-label="Open assistant"><svg class="ic"><use href="#i-chat"/></svg></button>
 
     <div class="chat-panel" id="chatPanel" style="display:none">
       <div class="chat-head">
@@ -797,13 +842,13 @@
           <div class="sub">“add 10 pens” · “sold 3 pens” · “what's low?”</div>
         </div>
         <div class="spacer"></div>
-        <button class="btn ghost icon" id="chatClose" title="Close">✕</button>
+        <button class="btn ghost icon" id="chatClose" title="Close" aria-label="Close chat"><svg class="ic"><use href="#i-close"/></svg></button>
       </div>
       <div class="chat-msgs" id="chatMsgs"></div>
       <div class="chat-chips" id="chatChips"></div>
       <div class="chat-input-row">
         <input id="chatInput" placeholder='e.g. "add 12 hammers" or "multi add 1 xts @ 599"' autocomplete="off" />
-        <button class="chat-send" id="chatSend" title="Send">➤</button>
+        <button class="chat-send" id="chatSend" title="Send" aria-label="Send"><svg class="ic"><use href="#i-send"/></svg></button>
       </div>
     </div>
 
@@ -1284,7 +1329,9 @@
         const saved = localStorage.getItem(LS_THEME);
         const dark = saved ? saved === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
         document.documentElement.dataset.theme = dark ? "dark" : "light";
-        document.getElementById("themeBtn").textContent = dark ? "☀️" : "🌙";
+        document.getElementById("themeBtn").innerHTML = dark
+          ? '<svg class="ic" aria-hidden="true"><use href="#i-sun"/></svg>'
+          : '<svg class="ic" aria-hidden="true"><use href="#i-moon"/></svg>';
       }
       document.getElementById("themeBtn").addEventListener("click", () => {
         const dark = document.documentElement.dataset.theme !== "dark";
@@ -1360,7 +1407,7 @@
         if (lowOut.length > 0) {
           const outs = lowOut.filter((it) => statusOf(it) === "out").length;
           badge.style.display = "";
-          badge.textContent = `🔔 ${lowOut.length} alert${lowOut.length > 1 ? "s" : ""}${outs ? ` · ${outs} out` : ""}`;
+          badge.innerHTML = `<svg class="ic" aria-hidden="true"><use href="#i-bell"/></svg> ${lowOut.length} alert${lowOut.length > 1 ? "s" : ""}${outs ? ` · ${outs} out` : ""}`;
         } else {
           badge.style.display = "none";
         }
@@ -1388,8 +1435,8 @@
             </td>
             <td>
               <div class="row-actions">
-                <button class="btn ghost icon" data-act="edit" data-id="${esc(it._id)}" title="Edit">✏️</button>
-                <button class="btn ghost icon" data-act="del" data-id="${esc(it._id)}" title="Delete">🗑️</button>
+                <button class="btn ghost icon" data-act="edit" data-id="${esc(it._id)}" title="Edit" aria-label="Edit ${esc(it.name)}"><svg class="ic"><use href="#i-edit"/></svg></button>
+                <button class="btn ghost icon" data-act="del" data-id="${esc(it._id)}" title="Delete" aria-label="Delete ${esc(it.name)}"><svg class="ic"><use href="#i-trash"/></svg></button>
               </div>
             </td>`;
           tbody.appendChild(tr);
@@ -2903,6 +2950,40 @@
           renderReportPanel();
         });
       })();
+
+      // ---- Reports & data: hidden by default; the toggle opens the panel ----
+      (function wireReportsToggle() {
+        const btn = $("reportsToggle");
+        const section = $("reportsSection");
+        if (!btn || !section) return;
+        btn.addEventListener("click", () => {
+          const open = section.style.display === "none";
+          section.style.display = open ? "" : "none";
+          btn.classList.toggle("open", open);
+          btn.setAttribute("aria-expanded", open ? "true" : "false");
+          if (open) renderReportPanel();
+        });
+      })();
+
+      // ---- Export CSV: full inventory of the active store (data exit path) ----
+      function exportCsv() {
+        const rows = [["Name", "Category", "Qty", "Unit price", "Unit cost", "Stock value", "Alert at"]];
+        for (const it of state.items) {
+          rows.push([it.name, it.category || "", it.qty, it.price ?? 0, it.cost ?? 0, it.qty * (it.price ?? 0), it.threshold ?? ""]);
+        }
+        const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\r\n");
+        const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        const slug = String(storeNameOf(state.storeId)).replace(/[^\w-]+/g, "-").toLowerCase();
+        a.download = `stockpilot-${slug}-${todayKey()}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+        toast("Inventory exported as CSV");
+      }
+      $("exportBtn").addEventListener("click", exportCsv);
 
       const ROUTES = [
         {
