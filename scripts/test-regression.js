@@ -610,6 +610,18 @@ try {
   check("reports: most-sold chart (top 7, CSS bars)", /Most sold items/.test(scripts[0]) && /bar-fill/.test(scripts[0]) && /slice\(0, 7\)/.test(scripts[0]));
   check("reports: chart + tables styled for chat width", /\.msg\.bot\.msg-html/.test(html) && /\.bar-track/.test(html));  check("reports: chat keeps plain text", /detailed report:/.test(scripts[0]));
   check("UI: sold-today stat is an edit button with affordance", /class="stat stat-btn"/.test(html) && /stat-hint/.test(html));
+
+  // ---- Clutter cleanup: quieter labels, ruled sections, text-only controls ----
+  check("UI: stat labels are sentence case", /Total items/.test(html) && /Units in stock/.test(html) && /Stock value/.test(html) && /Low \/ out of stock/.test(html) && /Store use today/.test(html));
+  check("UI: no uppercase micro-labels anywhere", !/text-transform: uppercase/.test(html));
+  check("UI: inventory table is a ruled section, not a boxed card", /background: transparent;\s*\n\s*border: none;\s*\n\s*border-top: 1px solid var\(--line\);/.test(html));
+  check("UI: reports panel is a ruled section, not a boxed card", /\n      \.reports \{\s*\n\s*background: transparent;\s*\n\s*border: none;\s*\n\s*border-top: 1px solid var\(--line\);/.test(html));
+  check("UI: alert badge is borderless text", /\.alert-badge \{[\s\S]*?border: 1px solid transparent;/.test(html));
+  check("UI: chat chips are quiet text links (no borders)", /\.chip \{\s*\n\s*font-size: 12px;\s*\n\s*padding: 5px 6px;\s*\n\s*border-radius: 8px;\s*\n\s*border: none;/.test(html));
+  check("UI: FAB glow is neutral (no colored shadow)", !/rgba\(79, 70, 229/.test(html));
+  check("UI: auth/account headings are plain text (no emoji)", /<h2 id="authTitle">Sign in to StockPilot<\/h2>/.test(html) && /<h3 id="acctTitle">Account settings<\/h3>/.test(html));
+  check("UI: search input has no decorative emoji", !/<div class="search">🔎/.test(html));
+  check("UI: secondary header actions are icon-only on desktop too", /\.header-actions \.btn-label \{ display: none; \}/.test(html));
   check("document has a <title>", /<title>[^<]+<\/title>/.test(html) && /StockPilot/.test((html.match(/<title>([^<]*)<\/title>/) || [])[1] || ""));
   check("viewport has viewport-fit=cover for safe-area insets", /content="width=device-width, initial-scale=1, viewport-fit=cover"/.test(html));
   check("mobile CSS layer exists (760px breakpoints)", (html.match(/@media \(max-width: 760px\)/g) || []).length >= 2);
