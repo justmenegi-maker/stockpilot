@@ -78,18 +78,18 @@
         font-size: 15px;
       }
       .spacer { flex: 1; }
-      .header-actions { display: flex; gap: 8px; align-items: center; }
+      .header-actions { display: flex; gap: 4px; align-items: center; }
       .alert-badge {
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        padding: 6px 10px;
-        border-radius: 999px;
-        font-size: 12px;
-        font-weight: 700;
-        background: color-mix(in srgb, var(--danger) 12%, var(--panel));
+        padding: 6px 8px;
+        border-radius: 9px;
+        font-size: 12.5px;
+        font-weight: 600;
+        background: transparent;
         color: var(--danger);
-        border: 1px solid color-mix(in srgb, var(--danger) 30%, var(--line));
+        border: 1px solid transparent;
         cursor: pointer;
       }
       .alert-badge:hover { filter: brightness(1.05); }
@@ -194,25 +194,23 @@
       .btn.ghost { border-color: transparent; background: transparent; }
       .btn.icon { padding: 8px 10px; }
       .table-wrap {
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: var(--radius);
+        background: transparent;
+        border: none;
+        border-top: 1px solid var(--line);
         overflow-x: auto;
       }
       table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 640px; }
       thead th {
         text-align: left;
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
+        font-size: 12px;
         color: var(--muted);
         padding: 10px 14px;
         border-bottom: 1px solid var(--line);
         white-space: nowrap;
       }
-      tbody td { padding: 12px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+      tbody td { padding: 11px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; }
       tbody tr:last-child td { border-bottom: none; }
-      tbody tr:hover { background: color-mix(in srgb, var(--panel) 70%, var(--bg)); }
+      tbody tr:hover { background: color-mix(in srgb, var(--ink) 3%, transparent); }
       .item-name { font-weight: 700; }
       .item-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
       td.qty { font-weight: 800; font-variant-numeric: tabular-nums; }
@@ -246,11 +244,9 @@
         border: none;
         background: var(--brand);
         color: var(--brand-ink);
-        background: var(--brand);
-        color: white;
         font-size: 24px;
         cursor: pointer;
-        box-shadow: 0 10px 24px rgba(79, 70, 229, 0.35);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.16);
         display: grid;
         place-items: center;
         transition: transform 0.15s;
@@ -296,15 +292,15 @@
       .chat-chips { display: flex; gap: 6px; padding: 0 14px 10px; flex-wrap: wrap; }
       .chip {
         font-size: 12px;
-        padding: 5px 10px;
-        border-radius: 999px;
-        border: 1px solid var(--line);
+        padding: 5px 6px;
+        border-radius: 8px;
+        border: none;
         background: transparent;
         color: var(--muted);
         cursor: pointer;
         white-space: nowrap;
       }
-      .chip:hover { color: var(--brand); border-color: var(--brand); }
+      .chip:hover { color: var(--brand); }
       .chat-input-row { display: flex; gap: 8px; padding: 10px 12px 12px; border-top: 1px solid var(--line); }
       .chat-input-row input {
         flex: 1;
@@ -341,7 +337,7 @@
       .dialog-body h3 { margin: 0 0 4px; font-size: 16px; letter-spacing: -0.01em; }
       .dialog-body p { margin: 0 0 16px; font-size: 13px; color: var(--muted); }
       .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; flex: 1; }
-      .field label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+      .field label { font-size: 12px; font-weight: 600; color: var(--muted); }
       .field input {
         border: 1px solid var(--line);
         border-radius: 10px;
@@ -465,7 +461,7 @@
         border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--line));
         border-radius: 12px; padding: 12px; margin-top: 16px;
       }
-      .danger-zone h4 { margin: 0 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--danger); }
+      .danger-zone h4 { margin: 0 0 4px; font-size: 12px; font-weight: 700; color: var(--danger); }
       .danger-zone p { margin: 0 0 10px; font-size: 12px; color: var(--muted); }
       .danger-zone .btn { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, var(--line)); }
 
@@ -490,10 +486,10 @@
 
       /* ================= Reports panel ================= */
       .reports {
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: var(--radius);
-        padding: 14px 16px;
+        background: transparent;
+        border: none;
+        border-top: 1px solid var(--line);
+        padding: 10px 0 0;
         margin-bottom: 16px;
       }
       .reports-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding-bottom: 8px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
@@ -507,7 +503,7 @@
       .rp-seg button:hover { color: var(--ink); }
       .rp-seg button.active { background: var(--brand); color: var(--brand-ink); }
       .rp-custom { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
-      .rp-custom label { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+      .rp-custom label { font-size: 12px; font-weight: 600; color: var(--muted); }
       .rp-custom input[type="date"] {
         background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
         padding: 7px 10px; color: var(--ink); font: inherit; font-size: 13px; outline: none;
@@ -517,11 +513,10 @@
       .rp-custom input[type="date"]:focus { border-color: var(--brand); }
       .rp-report {
         margin-top: 12px;
-        padding: 14px 4px 2px;
-        border-radius: 12px;
+        padding: 12px 4px 2px;
+        border-radius: 0;
         background: transparent;
         border: none;
-        border-top: 1px solid var(--line);
         font-size: 13px;
         line-height: 1.55;
         display: none;
@@ -535,12 +530,11 @@
       .rp-summary .kpi b.danger { color: var(--danger); }
       .rp-summary .kpi b.ok { color: var(--ok); }
       /* Ruled tables */
-      .rp-title { font-size: 11.5px; font-weight: 700; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; margin: 10px 10px 6px; }
+      .rp-title { font-size: 12px; font-weight: 700; color: var(--muted); margin: 10px 10px 6px; }
       .rp-table-wrap { overflow-x: auto; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
       table.rp-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: unset; }
       .rp-table th {
-        text-align: left; font-size: 11px; font-weight: 700; color: var(--muted);
-        letter-spacing: 0.04em; text-transform: uppercase;
+        text-align: left; font-size: 12px; font-weight: 600; color: var(--muted);
         padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap;
       }
       .rp-table td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
@@ -588,8 +582,9 @@
         .header-actions { gap: 6px; }
         .header-actions .btn { padding: 9px 11px; font-size: 13px; border-radius: 11px; }
         .header-actions .btn.ghost { min-height: 38px; }
+        .header-actions .btn-label { display: none; }
         .header-actions select { max-width: 116px; }
-        .btn-label { display: none; } /* secondary buttons go icon-only, titles/aria stay */
+              .btn-label { display: none; } /* secondary buttons go icon-only; titles/aria stay */
         /* Keep the primary action visible: + Add Item sticks to the viewport
            bottom-right, out of the chat FAB's way (left of it). */
         #addItemBtn {
@@ -721,12 +716,12 @@
 
       <div id="storeView">
       <div class="stats">
-        <div class="stat"><span class="label">Total Items</span><span class="value" id="statTotal">0</span></div>
-        <div class="stat"><span class="label">Units in Stock</span><span class="value" id="statUnits">0</span></div>
-        <div class="stat"><span class="label">Stock Value</span><span class="value" id="statValue">$0</span></div>
-        <div class="stat"><span class="label">Low / Out of Stock</span><span class="value danger" id="statLow">0</span></div>
+        <div class="stat"><span class="label">Total items</span><span class="value" id="statTotal">0</span></div>
+        <div class="stat"><span class="label">Units in stock</span><span class="value" id="statUnits">0</span></div>
+        <div class="stat"><span class="label">Stock value</span><span class="value" id="statValue">$0</span></div>
+        <div class="stat"><span class="label">Low / out of stock</span><span class="value danger" id="statLow">0</span></div>
         <button class="stat stat-btn" id="statSoldCard" title="Edit today's sales"><span class="label">Sold today</span><span class="value ok" id="statSoldToday">0</span><span class="stat-hint">edit →</span></button>
-        <div class="stat"><span class="label">Store Use Today</span><span class="value" id="statUseToday">0</span></div>
+        <div class="stat"><span class="label">Store use today</span><span class="value" id="statUseToday">0</span></div>
       </div>
 
       <!-- Sold Today: per-sale log for the active store with inline edit/delete.
@@ -735,13 +730,13 @@
       <div class="sold-section" id="soldSection">
         <div class="sold-head">
           <h3>Sold today</h3>
-          <button class="btn ghost" id="editSaleBtn" title="Edit or delete today's sales">✏️ Edit sales</button>
+          <button class="btn ghost" id="editSaleBtn" title="Edit or delete today's sales">Edit sales</button>
         </div>
         <div class="sold-list" id="soldList"></div>
       </div>
 
       <div class="toolbar">
-        <div class="search">🔎 <input id="searchInput" placeholder="Search items…" /></div>
+        <div class="search"><input id="searchInput" placeholder="Search items…" /></div>
         <select id="filterSelect" aria-label="Filter">
           <option value="all">All items</option>
           <option value="low">Low stock</option>
@@ -854,7 +849,7 @@
         <div class="auth-brand">
           <div class="logo-box">📦</div>
           <div>
-            <h2 id="authTitle">☁️ Sign in to StockPilot</h2>
+            <h2 id="authTitle">Sign in to StockPilot</h2>
             <p class="sub" id="authSub">One account, all your stores — synced in the cloud.</p>
           </div>
         </div>
@@ -910,11 +905,11 @@
     <!-- Account settings: profile details + Supabase connection management. -->
     <dialog id="accountDialog">
       <div class="dialog-body">
-        <h3 id="acctTitle">👤 Account settings</h3>
+        <h3 id="acctTitle">Account settings</h3>
         <p id="acctSub" class="hint" style="margin:0 0 12px"></p>
         <div class="acct-tabs">
           <button type="button" data-tab="profile" class="active">Profile</button>
-          <button type="button" data-tab="cloud">☁️ Supabase</button>
+          <button type="button" data-tab="cloud">Supabase</button>
           <button type="button" data-tab="danger">Danger zone</button>
         </div>
 
