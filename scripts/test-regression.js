@@ -251,7 +251,7 @@ function check(name, cond, extra) {
 // appended to the app source before it runs. The script must be evaluated exactly
 // once in this context — a second run would redeclare its top-level consts.
 sandbox.__capture = null;
-const epilogue = `;__capture = { state, handleCommand, localStores, showView, resetReports, renderReportPanel, uiView: () => uiView, createStoreOffline, loadOfflineStore, runAutoPrune, pruneStateSales, pruneCutoffDate, RETENTION_DAYS, salesBreakdown, isCustomSale, saveSalesEdit, deleteSaleRow, renderSoldList, renderSoldEditor, openSold, recordMovement, exportCsv, takeStock, adjustQty, reportText, acctOpen, acctFillProfile, testCloudConnection, friendlyAuthError, acctDlg: () => acctDlg, showPending, setAuthMode, afterSignIn, authMode: () => authMode };`;
+const epilogue = `;__capture = { state, handleCommand, localStores, showView, resetReports, renderReportPanel, uiView: () => uiView, createStoreOffline, loadOfflineStore, runAutoPrune, pruneStateSales, pruneCutoffDate, RETENTION_DAYS, salesBreakdown, isCustomSale, saveSalesEdit, deleteSaleRow, renderSoldList, renderSoldEditor, openSold, recordMovement, exportCsv, takeStock, adjustQty, reportText, reportRows, reportTableHtml, chatReportReply, TRENDABLE, PIE_COLORS, acctOpen, acctFillProfile, testCloudConnection, friendlyAuthError, acctDlg: () => acctDlg, showPending, setAuthMode, afterSignIn, authMode: () => authMode };`;
 try {
   vm.runInContext(scripts[0] + epilogue, sandbox, { filename: "index.html:inline+epilogue" });
 } catch (e) {
@@ -259,7 +259,7 @@ try {
   process.exit(1);
 }
 const app = sandbox.__capture;
-const { state, handleCommand, localStores, showView, resetReports, renderReportPanel, exportCsv } = app;
+const { state, handleCommand, localStores, showView, resetReports, renderReportPanel, exportCsv, reportRows, reportTableHtml, chatReportReply } = app;
 
 // The app's prune promise chains are simple resolve queues; a short synchronous
 // busy-wait lets the vm's microtask queue run between synchronous calls.
@@ -350,6 +350,30 @@ try {
     check("csv: BOM + header row + quoted fields", text.startsWith("\ufeff") && text.includes('"Name","Category","Qty","Unit price","Unit cost","Stock value","Alert at"'), JSON.stringify(text.slice(0, 80)));
     const csvItem = state.items.find((it) => it.name === "CSV Item");
     check("csv: item row lands in the output", !csvItem || text.includes('"CSV Item"'), JSON.stringify(text.slice(0, 120)));
+  }
+
+  console.log("\n— Report graphs & pie (this pass) —");
+  {
+    const wk = reportTableHtml(reportRows("week"), "table");
+    const gr = reportTableHtml(reportRows("week"), "graph");
+    const ch = reportTableHtml(reportRows("week"), "chat");
+    check("weekly table view: Table/Graph switch rendered", /data-rp-view="graph"/.test(wk) && /data-rp-view="table"/.test(wk));
+    check("weekly table view: no per-day trend", !/class="trend"/.test(wk));
+    check("weekly graph view: per-day trend bars", (gr.match(/trend-bar/g) || []).length >= 1 && /class="trend"/.test(gr));
+    check("weekly graph view: tables hidden (visual summary)", !/Items sold/.test(gr) && !/Store use \(not sales\)/.test(gr));
+    check("chat weekly reply: trend included, no switch buttons", /class="trend"/.test(ch) && !/data-rp-view/.test(ch));
+    check("daily report: no switch (single day)", !/data-rp-view/.test(reportTableHtml(reportRows("day"), "table")));
+    const todayKey0 = new Date().toLocaleDateString("en-CA");
+    const cug = reportTableHtml(reportRows("custom", todayKey0, todayKey0), "graph");
+    check("custom range graph: trend renders", /class="trend"/.test(cug) && /trend-bar/.test(cug));
+    check("trend bars sized by share of max", /trend-bar" style="height:\d+%/.test(gr) && /height:100%/.test(gr), gr.match(/trend-bar" style="[^"]+/) ? gr.match(/trend-bar" style="[^"]+/)[0] : "no heights");
+    check("pie: conic-gradient with percent stops", /background:conic-gradient\(/.test(ch) && /% /.test(ch), ch.match(/background:conic-gradient\([^)]{0,60}/) ? ch.match(/background:conic-gradient\([^)]{0,60}/)[0] : "");
+    const sliceCount = (ch.match(/legend-row/g) || []).length;
+    check("pie legend rows present", sliceCount >= 1, String(sliceCount));
+    check("pie capped at 10 colors + Other", (ch.match(/legend-dot/g) || []).length <= 11);
+    const chatWk = unwrap(handleCommand("weekly report"));
+    check("chat weekly report: trend + pie + tables", /class="trend"/.test(chatWk) && /conic-gradient/.test(chatWk) && /Items sold/.test(chatWk));
+    check("chat monthly report: trend + pie", (() => { const h = unwrap(handleCommand("monthly report")); return /class="trend"/.test(h) && /conic-gradient/.test(h); })());
   }
 
   console.log("\n— Reports panel —");
