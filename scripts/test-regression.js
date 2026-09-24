@@ -122,6 +122,8 @@ const els = {
   storeName: makeEl("input"),
   authErr: makeEl("p"),
   authSubmit: makeEl("button"),
+  authGoogle: makeEl("button"),
+  authDivider: makeEl("div"),
   authToggle: makeEl("button"),
   offlineBtn: makeEl("button"),
   cfgSave: makeEl("button"),
@@ -214,6 +216,7 @@ const sandbox = {
   document: documentObj,
   Blob: function (parts, opts) { return { parts, opts, size: (parts[0] || "").length }; },
   window: {},
+  location: { origin: "https://stockpilot.test", pathname: "/" },
   Date,
   Math,
   URL: class extends URL {
@@ -251,7 +254,7 @@ function check(name, cond, extra) {
 // appended to the app source before it runs. The script must be evaluated exactly
 // once in this context — a second run would redeclare its top-level consts.
 sandbox.__capture = null;
-const epilogue = `;__capture = { state, handleCommand, localStores, showView, resetReports, renderReportPanel, uiView: () => uiView, createStoreOffline, loadOfflineStore, runAutoPrune, pruneStateSales, pruneCutoffDate, RETENTION_DAYS, salesBreakdown, isCustomSale, saveSalesEdit, deleteSaleRow, renderSoldList, renderSoldEditor, openSold, recordMovement, exportCsv, takeStock, adjustQty, reportText, reportRows, reportTableHtml, chatReportReply, TRENDABLE, PIE_COLORS, acctOpen, acctFillProfile, testCloudConnection, friendlyAuthError, acctDlg: () => acctDlg, showPending, setAuthMode, afterSignIn, authMode: () => authMode };`;
+const epilogue = `;__capture = { state, handleCommand, localStores, showView, resetReports, renderReportPanel, uiView: () => uiView, createStoreOffline, loadOfflineStore, runAutoPrune, pruneStateSales, pruneCutoffDate, RETENTION_DAYS, salesBreakdown, isCustomSale, saveSalesEdit, deleteSaleRow, renderSoldList, renderSoldEditor, openSold, recordMovement, exportCsv, takeStock, adjustQty, reportText, reportRows, reportTableHtml, chatReportReply, TRENDABLE, PIE_COLORS, acctOpen, acctFillProfile, testCloudConnection, friendlyAuthError, acctDlg: () => acctDlg, showPending, setAuthMode, afterSignIn, authMode: () => authMode, signInWithGoogle };`;
 try {
   vm.runInContext(scripts[0] + epilogue, sandbox, { filename: "index.html:inline+epilogue" });
 } catch (e) {
@@ -642,6 +645,11 @@ try {
 
   // ---- P0.4 security: CSP, referrer policy, attribute escaping ----
   // html (head metas live outside the inline script) and scripts[0] are in scope.
+  // ---- Google sign-in (Supabase OAuth) ----
+  check("google auth: OAuth button present with inline brand SVG (CSP-safe)", /id="authGoogle"/.test(html) && /google-btn/.test(html) && /<svg viewBox="0 0 24 24"/.test(html));
+  check("google auth: divider + button hidden on pending screen and restored by setAuthMode", /"authLinksRow", "authDivider", "authGoogle"/.test(scripts[0]) && (scripts[0].match(/"authDivider", "authGoogle"/g) || []).length === 2);
+  check("google auth: uses supabase-js signInWithOAuth with google provider + redirect", /signInWithOAuth\(\{\s*provider: "google",\s*options: \{ redirectTo: location\.origin \+ location\.pathname \},\s*\}\)/.test(scripts[0]));
+
   check("CSP meta restricts network to Supabase + CDN", /http-equiv="Content-Security-Policy"[^>]*connect-src 'self' https:\/\/\*\.supabase\.co wss:\/\/\*\.supabase\.co/.test(html));
   check("CSP meta forbids objects, forms and base hijacking", /object-src 'none'/.test(html) && /form-action 'none'/.test(html) && /base-uri 'none'/.test(html));
   check("referrer policy is no-referrer", /<meta name="referrer" content="no-referrer" \/>/.test(html));
@@ -826,6 +834,30 @@ try {
     check("a first store was auto-created", mock.counts.insert === 1, `inserts=${mock.counts.insert}`);
     check("store name from signup is preserved", mock.stores().length === 1 && mock.stores()[0].name === "Corner Shop", JSON.stringify(mock.stores()));
     check("pendingStore stash cleared after healing", store.get("stockpilot.pendingStore") == null, String(store.get("stockpilot.pendingStore")));
+
+    // Google OAuth: clicking the button must call signInWithOAuth and report
+    // provider errors through the standard authFail path.
+    let oauthCalls = [];
+    mock.auth.signInWithOAuth = async (opts) => {
+      oauthCalls.push(opts);
+      if (els.authEmail.value.trim() === "failme@shop.com") return { error: new Error("Provider is not enabled") };
+      return { data: { provider: "google", url: "https://accounts.google.com/o/oauth2/auth" }, error: null };
+    };
+    app.setAuthMode("signin");
+    els.authEmail.value = "";
+    els.authPass.value = "";
+    els.authErr.style.display = "none";
+    els.authGoogle.click();
+    await new Promise((r) => setTimeout(r, 0));
+    check("google auth: button click calls signInWithOAuth", oauthCalls.length === 1 && oauthCalls[0].provider === "google", JSON.stringify(oauthCalls));
+    check("google auth: redirectTo returns to the app page itself", oauthCalls.length === 1 && oauthCalls[0].options && oauthCalls[0].options.redirectTo === "https://stockpilot.test/", JSON.stringify(oauthCalls[0] && oauthCalls[0].options));
+    check("google auth: button disables during redirect", els.authGoogle.disabled === true, String(els.authGoogle.disabled));
+    els.authErr.style.display = "none";
+    els.authEmail.value = "failme@shop.com";
+    els.authGoogle.click();
+    await new Promise((r) => setTimeout(r, 0));
+    check("google auth: provider error surfaces as friendly auth message", /providers → google/i.test(els.authErr.textContent), els.authErr.textContent);
+    check("google auth: button re-enabled after error", els.authGoogle.disabled === false, String(els.authGoogle.disabled));
 
     // Re-run: an account that already has stores must not get a duplicate.
     const before = mock.counts.insert;
