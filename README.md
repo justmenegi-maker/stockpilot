@@ -19,7 +19,7 @@ StockPilot is a full Progressive Web App — installable, offline-capable, with 
 
 ## Features
 
-- **Polished sign-in screen** — Sign in / Create account tabs, show-password toggle, friendly error messages (wrong password, unconfirmed email, rate limits), a loading state on the submit button, and a collapsible **Supabase connection (advanced)** panel with a **Test connection** button that checks reachability, the auth service, and all four required tables
+- **Polished sign-in screen** — Sign in / Create account tabs, show-password toggle, friendly error messages (wrong password, unconfirmed email, rate limits), a **Continue with Google** button (Supabase OAuth), a loading state on the submit button, and a collapsible **Supabase connection (advanced)** panel with a **Test connection** button that checks reachability, the auth service, and all four required tables
 - **Account settings (👤 Account in the header, when signed in)** — three tabs:
   - **Profile** — edit your display name and password (email shown read-only); changes are saved to your Supabase auth user and follow you to every device
   - **☁️ Supabase** — live connection status (reachable / auth / tables), switch to a different project (URL + key) with a validated **Save & reconnect**, **Test connection**, or return to the pre-wired default project
@@ -72,6 +72,8 @@ StockPilot is **pre-wired to its Supabase project** — the URL (`https://xfeegg
 2. Open StockPilot and **Sign up** with your email and a password — no keys to paste. (You can point the app at a different project later from **👤 Account → ☁️ Supabase**.)
 3. During sign-up you name your first store. After that a **store dropdown** appears in the header — pick it to switch stores; every store keeps its own items, sales, reports, and currency.
 
+**Google sign-in:** in the Supabase dashboard open **Authentication → Providers → Google**, enable it with your Google Cloud OAuth client ID/secret, then add your site's URL (e.g. `https://your-app.vercel.app`) under **Authentication → URL Configuration → Redirect URLs**. A "Continue with Google" button on the sign-in screen handles the rest — Google accounts land in the same stores/tables, with the same row-level security as email accounts.
+
 To point StockPilot at a *different* Supabase project, run `supabase-setup.sql` there, then paste that project's URL and publishable/anon key in the sign-in screen and click **Save cloud settings** — explicit values always override the pre-wired ones.
 
 Notes:
@@ -86,7 +88,7 @@ Notes:
 
 Run from the project root (Node 18+; no dependencies to install):
 
-- `npm test` (or `node scripts/test-regression.js`) — full regression harness: runs the app's inline script in a sandboxed DOM/localStorage and exercises the chat engine, detailed reports, custom sales, store use, edit-sale, auto-cleanup, store switching, theme, the login screen, the account dialog, and the Supabase connection test (102 checks).
+- `npm test` (or `node scripts/test-regression.js`) — full regression harness: runs the app's inline script in a sandboxed DOM/localStorage and exercises the chat engine, detailed reports, custom sales, store use, edit-sale, auto-cleanup, store switching, theme, the login screen, the account dialog, and the Supabase connection test (221 checks).
 - `npm run test:e2e` (or `node scripts/e2e-cloud-test.js [--keep]`) — live end-to-end cloud test against the wired Supabase project: signup → store → item → sale → verify persisted rows → cleanup. Add `--keep` to leave the test data in place. *Note: while the project's "Confirm email" setting is ON, signup returns no session and the script stops with instructions; the app itself handles this with a check-your-inbox flow.*
 
 ## Notes

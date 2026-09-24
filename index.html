@@ -437,6 +437,11 @@
       .pass-eye:hover { color: var(--brand); }
       .auth-card .btn { width: 100%; justify-content: center; }
       .auth-submit { margin-top: 4px; padding: 11px 14px; font-size: 14.5px; border-radius: 12px; }
+      .auth-divider { display: flex; align-items: center; gap: 10px; margin: 12px 0 4px; color: var(--muted); font-size: 11.5px; letter-spacing: 0.04em; }
+      .auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+      .google-btn { width: 100%; justify-content: center; margin-top: 4px; padding: 11px 14px; font-size: 14.5px; border: 1px solid var(--line); background: var(--panel); }
+      .google-btn:hover { background: color-mix(in srgb, var(--ink) 7%, var(--panel)); border-color: color-mix(in srgb, var(--ink) 18%, var(--line)); }
+      .google-btn svg { flex: 0 0 auto; }
       .auth-links { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; gap: 8px; flex-wrap: wrap; }
       .pending-wrap { text-align: center; padding: 4px 0 2px; }
       .pending-icon { font-size: 36px; margin-bottom: 4px; }
@@ -945,6 +950,11 @@
         </div>
         <p class="err" id="authErr" style="display:none"></p>
         <button class="btn primary auth-submit" id="authSubmit">Sign in</button>
+        <div class="auth-divider" id="authDivider"><span>or</span></div>
+        <button class="btn google-btn" id="authGoogle" title="Sign in with your Google account">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="#4285F4" d="M23.5 12.27c0-.85-.08-1.66-.22-2.45H12v4.64h6.46a5.53 5.53 0 0 1-2.4 3.63v3h3.87c2.27-2.09 3.57-5.17 3.57-8.82z"/><path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.94-2.91l-3.87-3c-1.07.72-2.44 1.15-4.07 1.15-3.13 0-5.78-2.11-6.73-4.96H1.29v3.1A12 12 0 0 0 12 24z"/><path fill="#FBBC05" d="M5.27 14.28a7.2 7.2 0 0 1 0-4.56v-3.1H1.29a12 12 0 0 0 0 10.76l3.98-3.1z"/><path fill="#EA4335" d="M12 4.76c1.76 0 3.35.61 4.6 1.8l3.43-3.43C17.95 1.2 15.23 0 12 0A12 12 0 0 0 1.29 6.62l3.98 3.1C6.22 6.87 8.87 4.76 12 4.76z"/></svg>
+          <span>Continue with Google</span>
+        </button>
         <div id="authPending" style="display:none">
           <div class="pending-wrap">
             <div class="pending-icon">📧</div>
@@ -1719,7 +1729,7 @@
         $("authToggle").textContent = mode === "signup" ? "I already have an account" : "New here? Create account";
         $("storeNameField").classList.toggle("hidden", mode !== "signup");
         $("authPending").style.display = "none";
-        for (const id of ["authTabs", "authFields", "authSubmit", "authLinksRow"]) $(id).style.display = "";
+        for (const id of ["authTabs", "authFields", "authSubmit", "authLinksRow", "authDivider", "authGoogle"]) $(id).style.display = "";
         authErr.style.display = "none";
       }
       // Auth tabs + password visibility toggle.
@@ -1747,6 +1757,8 @@
           [/unable to validate email/i, "That doesn't look like a valid email address."],
           [/failed to fetch|networkerror|load failed/i, "Can't reach the server — check your internet connection."],
           [/signups not allowed/i, "New signups are turned off on this Supabase project — enable email sign-up under Authentication → Providers."],
+          [/provider is not enabled|unsupported provider/i, "Google sign-in isn't enabled on this Supabase project yet — turn it on under Authentication → Providers → Google."],
+          [/redirect|url.*not.*(allow|included)/i, "Google sign-in couldn't return to this site — add this exact URL under Authentication → URL Configuration → Redirect URLs in Supabase."],
           [/only request this after/i, "Please wait a minute before requesting another email."],
           [/row-level security/i, "Cloud write was rejected — run supabase-setup.sql on this project (tables/policies missing)."],
           [/database error saving new user/i, "The server couldn't create the account right now — try again shortly."],
@@ -2180,12 +2192,44 @@
         }
       });
 
+      // ---- Google sign-in (OAuth via Supabase; enable the provider in the
+      // dashboard: Authentication -> Providers -> Google, and add this site's
+      // URL under Authentication -> URL Configuration -> Redirect URLs). The
+      // browser goes to Google and comes back to this page; supabase-js detects
+      // the returned code on load, and boot()'s getSession() picks the session
+      // up — the same afterSignIn / self-heal store flow as email sign-in.
+      async function signInWithGoogle() {
+        if (!sb) {
+          const built = makeClient();
+          if (built.error) return authFail(built.error);
+          sb = built.client;
+        }
+        const btn = $("authGoogle");
+        btn.disabled = true;
+        try {
+          const { error } = await sb.auth.signInWithOAuth({
+            provider: "google",
+            options: { redirectTo: location.origin + location.pathname },
+          });
+          if (error) {
+            btn.disabled = false;
+            authFail(friendlyAuthError(error));
+          }
+          // Success: the browser is navigating away to Google — leave the button
+          // disabled so it can't be double-clicked mid-redirect.
+        } catch (e) {
+          btn.disabled = false;
+          authFail(friendlyAuthError(e));
+        }
+      }
+      $("authGoogle").addEventListener("click", signInWithGoogle);
+
       // ---- Check-your-inbox state (signup with "Confirm email" enabled) ----
       function showPending(email, storeName) {
         // Remember the wanted first-store name; sign-in uses it after confirmation.
         if (storeName) localStorage.setItem("stockpilot.pendingStore", JSON.stringify(storeName));
         $("pendingSub").innerHTML = `We sent a confirmation link to <b>${esc(email)}</b>. Click it, then sign in here — your store "${esc(storeName || "My Store")}" will be waiting.`;
-        for (const id of ["authTabs", "authFields", "authSubmit", "authLinksRow"]) $(id).style.display = "none";
+        for (const id of ["authTabs", "authFields", "authSubmit", "authLinksRow", "authDivider", "authGoogle"]) $(id).style.display = "none";
         $("authErr").style.display = "none";
         $("pendingHint").textContent = "";
         $("authPending").style.display = "";
