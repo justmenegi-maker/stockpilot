@@ -6,20 +6,20 @@
     <meta name="description" content="StockPilot — a fast, offline-capable multi-store inventory manager with sales reports, low-stock alerts, a chat assistant, and optional Supabase cloud sync." />
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'" />
     <meta name="referrer" content="no-referrer" />
-    <meta name="theme-color" content="#4f46e5" />
+    <meta name="theme-color" content="#2563eb" />
     <meta name="color-scheme" content="light dark" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./icons/icon-192.png" />
     <title>StockPilot — Multi-store Inventory</title>
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%234f46e5'/%3E%3Ctext x='32' y='44' font-size='36' text-anchor='middle'%3E%F0%9F%93%A6%3C/text%3E%3C/svg%3E" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232563eb'/%3E%3Ctext x='32' y='44' font-size='36' text-anchor='middle'%3E%F0%9F%93%A6%3C/text%3E%3C/svg%3E" />
     <style>
       :root {
-        --bg: #f2ede3;          /* warm beige page */
-        --panel: #fffdf8;       /* white card surface */
-        --ink: #262117;         /* warm near-black */
-        --muted: #857a68;       /* warm grey */
-        --line: #e2d9c8;        /* beige hairline */
-        --brand: #4f46e5;
+        --bg: #f4f1ea;          /* calm warm-neutral page */
+        --panel: #fdfcf9;       /* soft off-white card surface */
+        --ink: #2b2824;         /* soft warm near-black */
+        --muted: #8a8275;       /* warm grey */
+        --line: #e6e0d4;        /* neutral hairline */
+        --brand: #2563eb;       /* royal blue */
         --brand-ink: #ffffff;
         --ok: #16a34a;
         --warn: #b45309;
@@ -27,12 +27,12 @@
         --radius: 12px;
       }
       [data-theme="dark"] {
-        --bg: #0a0a0a;          /* true black page */
-        --panel: #171717;       /* dark grey surface */
-        --ink: #e8e8e8;
+        --bg: #121212;          /* softened charcoal page */
+        --panel: #1d1d1d;       /* softened dark surface */
+        --ink: #e6e6e6;
         --muted: #9c9c9c;
-        --line: #2a2a2a;        /* dark grey hairline */
-        --brand: #818cf8;
+        --line: #2c2c2c;        /* dark grey hairline */
+        --brand: #6d8fef;       /* softened royal blue */
         --brand-ink: #0a0a0a;
         --ok: #4ade80;
         --warn: #fbbf24;
@@ -602,10 +602,10 @@
       .legend-dot { width: 9px; height: 9px; border-radius: 3px; flex: none; }
       .legend-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .legend-row .num { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
-      .pc1 { background: #4f46e5; } .pc2 { background: #0ea5e9; } .pc3 { background: #10b981; }
-      .pc4 { background: #f59e0b; } .pc5 { background: #ef4444; } .pc6 { background: #8b5cf6; }
+      .pc1 { background: #2563eb; } .pc2 { background: #d4af37; } .pc3 { background: #2f9e6e; }
+      .pc4 { background: #0ea5e9; } .pc5 { background: #ef4444; } .pc6 { background: #8b5cf6; }
       .pc7 { background: #14b8a6; } .pc8 { background: #ec4899; } .pc9 { background: #84cc16; }
-      .pc10 { background: #64748b; }
+      .pc10 { background: #8a8275; }
       /* Chat: report replies render full-width so tables fit */
       .msg.bot.msg-html {
         max-width: 100%; width: 100%;
@@ -2892,7 +2892,7 @@
       }
 
       // Top 10 products pie: conic-gradient slices by share of units sold + colour legend.
-      const PIE_COLORS = ["#4f46e5", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#14b8a6", "#ec4899", "#84cc16", "#64748b"];
+      const PIE_COLORS = ["#2563eb", "#d4af37", "#2f9e6e", "#0ea5e9", "#ef4444", "#8b5cf6", "#14b8a6", "#ec4899", "#84cc16", "#8a8275"];
       function topItemsHtml(breakdown, units) {
         if (!breakdown.length) return "";
         const top = breakdown.slice(0, 10);
