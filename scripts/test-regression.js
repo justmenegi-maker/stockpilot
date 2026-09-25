@@ -657,7 +657,7 @@ try {
   const glassCss = (() => { try { return fs.readFileSync("vendor/liquid-glass/glass.css", "utf8"); } catch { return ""; } })();
   check("glass: library vendored locally (CSP-safe: no CDN refs, html2canvas path unreachable)", /class Container \{/.test(glassLib) && !/cdn\.jsdelivr/.test(glassLib + glassAdapter) && !/html2canvas\s*\(/.test(glassAdapter) && /Container\.pageSnapshot = snap;/.test(glassAdapter) && /src="\.\/vendor\/liquid-glass\/container\.js"/.test(html) && /src="\.\/vendor\/liquid-glass\/stockpilot-liquid-glass\.js"/.test(html) && /rel="stylesheet" href="\.\/vendor\/liquid-glass\/glass\.css"/.test(html) && /\.glass-container \{/.test(glassCss));
   check("glass: adapter is guarded (WebGL probe, reduced-motion, late boot)", /getContext\("webgl"\)/.test(glassAdapter) && /prefers-reduced-motion: reduce/.test(glassAdapter) && /window\.addEventListener\("load", boot\)/.test(glassAdapter) && /typeof window === "undefined" \|\| typeof document === "undefined"/.test(glassAdapter));
-  check("glass: app surfaces are opt-in hosts with CSS fallback chips", /\.lg-layer \{/.test(html) && /\.auth-card \{ position: relative; overflow: hidden; \}/.test(html) && /header \{ overflow: hidden; \}/.test(html) && /@supports not \(backdrop-filter: blur\(1px\)\)/.test(html) && /@media \(prefers-reduced-motion: reduce\)/.test(html));
+  check("glass: app surfaces are opt-in hosts with frosted CSS fallbacks", /\.lg-layer \{/.test(html) && /backdrop-filter: blur\(18px\) saturate\(1\.6\)/.test(html) && /backdrop-filter: blur\(22px\) saturate\(1\.5\)/.test(html) && /@supports not \(backdrop-filter: blur\(1px\)\)/.test(html) && glassAdapter.indexOf("prefers-reduced-motion: reduce") !== -1);
   check("glass: small viewports skip WebGL + hard caps (4 surfaces, DPR ≤ 1.5, debounced resize)", /w > 0 && w <= 520/.test(glassAdapter) && /var MAX = 4;/.test(glassAdapter) && /devicePixelRatio \|\| 1, 1\.5\)/.test(glassAdapter) && /new ResizeObserver/.test(glassAdapter) && /pendingResize/.test(glassAdapter));
   check("glass: snapshot is procedural + theme-aware (no stale page capture)", /Container\.pageSnapshot = snap;/.test(glassAdapter) && /window\.refreshGlassTheme = function/.test(glassAdapter) && /refreshGlassTheme\(\)/.test(scripts[0]));
   check("CSP meta restricts network to Supabase + CDN", /http-equiv="Content-Security-Policy"[^>]*connect-src 'self' https:\/\/\*\.supabase\.co wss:\/\/\*\.supabase\.co/.test(html));
@@ -973,7 +973,7 @@ try {
     gsbx.__glassProbe = null;
     vm.runInContext("__glassProbe = { count: Container.instances.length, canvasW: Container.instances[0] ? Container.instances[0].canvas.width : 0, snapshot: !!Container.pageSnapshot, ready: window.__stockpilotGlassReady };", gsbx);
     const gp = gsbx.__glassProbe;
-    check("glass: real pipeline boots on all 4 surfaces without html2canvas", gp.count === 4 && gp.snapshot === true && html2canvasCalls === 0 && gp.ready === true, JSON.stringify({ gp, html2canvasCalls }));
+    check("glass: real pipeline boots on the 3 surfaces without html2canvas", gp.count === 3 && gp.snapshot === true && html2canvasCalls === 0 && gp.ready === true, JSON.stringify({ gp, html2canvasCalls }));
     check("glass: device pixel ratio is capped (2.0 device → 1.5 backing store)", gp.canvasW === Math.round(320 * 1.5), String(gp.canvasW));
 
     // Re-run: an account that already has stores must not get a duplicate.

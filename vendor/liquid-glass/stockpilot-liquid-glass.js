@@ -206,7 +206,6 @@
       createGlass(document.querySelector(".auth-card"), { borderRadius: 20, type: "rounded", tintOpacity: 0.2 });
       createGlass(document.querySelector("header"), { borderRadius: 0, type: "rounded", tintOpacity: 0.16 });
       createGlass(document.getElementById("chatFab"), { borderRadius: 999, type: "circle", tintOpacity: 0.2 });
-      createGlass(document.getElementById("toastWrap"), { borderRadius: 12, type: "rounded", tintOpacity: 0.14 });
       if (created > 0) {
         window.__stockpilotGlassReady = true;
         document.documentElement.classList.add("lg-ready");
