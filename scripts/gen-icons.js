@@ -1,5 +1,5 @@
 // StockPilot PWA icon generator — zero dependencies (Node built-ins only).
-// Draws the StockPilot package icon (royal blue gradient, white box with gold seam+tape)
+// Draws the StockPilot package icon (monk-robe red gradient, white box with gold seam+tape)
 // and encodes it as PNGs via a minimal built-in PNG writer.
 //
 //   node scripts/gen-icons.js   →  icons/icon-192.png, icons/icon-512.png,
@@ -68,12 +68,12 @@ function lerp(a, b, t) { return a + (b - a) * t; }
 
 // Gradient: top #6366f1 → bottom #4338ca (indigo, matches app brand)
 function bgColor(y) {
-  return [lerp(0x2f, 0x1b, y), lerp(0x5d, 0x3d, y), lerp(0xeb, 0xc2, y)];
+  return [lerp(0xb8, 0x8c, y), lerp(0x45, 0x2c, y), lerp(0x3a, 0x24, y)];
 }
-const ACCENT = [0xd4, 0xaf, 0x37]; // seam + tape (gold)
+const ACCENT = [0xd4, 0xaf, 0x37]; // seam + tape (temple gold)
 const WHITE = [0xff, 0xff, 0xff];
 
-// Box pictogram: white rounded box with a gold horizontal seam and vertical tape.
+// Box pictogram: white rounded box with a temple-gold horizontal seam and vertical tape.
 function drawUnit(px, py, maskable) {
   // Background
   const bgR = maskable ? 0 : 0.22; // maskable icons must be full-bleed (no transparency)

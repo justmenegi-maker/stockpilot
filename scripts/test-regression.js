@@ -665,7 +665,7 @@ try {
   try { const mf = JSON.parse(fs.readFileSync("manifest.webmanifest", "utf8")); manifestOk = mf.display === "standalone" && mf.start_url === "./"; manifestIcons = mf.icons.length; } catch {}
   check("PWA manifest is valid standalone with relative start_url", manifestOk);
   check("PWA manifest declares 4 icons incl. maskable", manifestIcons === 4);
-  check("index.html links manifest, theme-color and apple icon", /rel="manifest" href="\.\/manifest\.webmanifest"/.test(html) && /name="theme-color" content="#2563eb"/.test(html) && /rel="apple-touch-icon"/.test(html));
+  check("index.html links manifest, theme-color and apple icon", /rel="manifest" href="\.\/manifest\.webmanifest"/.test(html) && /name="theme-color" content="#b23a2f"/.test(html) && /rel="apple-touch-icon"/.test(html));
   check("CSP allows same-origin manifest and worker", /manifest-src 'self'/.test(html) && /worker-src 'self'/.test(html));
   let swOk = false;
   try { const sw = fs.readFileSync("sw.js", "utf8"); swOk = sw.includes('addEventListener("fetch"') && sw.includes('url.origin !== self.location.origin') && sw.includes('caches.open'); } catch {}
@@ -676,8 +676,8 @@ try {
   // ---- Mobile UI: viewport, safe areas, stable inputs ----
   // ---- Simplified UI language ----
   // ---- Color scheme: beige/white light, black/dark-grey dark ----
-  check("colors: light theme is calm warm neutrals", /--bg: #f4f1ea;/.test(html) && /--panel: #fdfcf9;/.test(html) && /--line: #e6e0d4;/.test(html));
-  check("colors: dark theme is softened charcoal", /--bg: #121212;/.test(html) && /--panel: #1d1d1d;/.test(html) && /--line: #2c2c2c;/.test(html));
+  check("colors: light theme is temple ivory + robe red", /--bg: #f7f4ec;/.test(html) && /--panel: #fffdf7;/.test(html) && /--brand: #b23a2f;/.test(html));
+  check("colors: dark theme is night-temple lacquer", /--bg: #151110;/.test(html) && /--panel: #211a17;/.test(html) && /--brand: #d46a5b;/.test(html));
   check("colors: status tints are theme-mixed (no hardcoded pastels)", !/#fef2f2|#fffbeb|#f0fdf4|#450a0a|#451a03|#052e16/.test(html));
   check("UI: brand mark is flat (no gradient)", !/linear-gradient\(135deg, #6366f1, #8b5cf6\)/.test(html));
   check("UI: default buttons are borderless tinted pills", /border: 1px solid transparent;\s*\n\s*background: color-mix\(in srgb, var\(--ink\) 5%, transparent\);/.test(html));
