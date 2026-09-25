@@ -10,6 +10,7 @@
     <meta name="color-scheme" content="light dark" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+    <link rel="stylesheet" href="./vendor/liquid-glass/glass.css" />
     <title>StockPilot — Multi-store Inventory</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%234f46e5'/%3E%3Ctext x='32' y='44' font-size='36' text-anchor='middle'%3E%F0%9F%93%A6%3C/text%3E%3C/svg%3E" />
     <style>
@@ -25,6 +26,9 @@
         --warn: #b45309;
         --danger: #dc2626;
         --radius: 12px;
+        --lg-a: #f2ede3;        /* liquid-glass ambient texture stops */
+        --lg-b: #e7e0d2;
+        --lg-c: #d9d2c2;
       }
       [data-theme="dark"] {
         --bg: #0a0a0a;          /* true black page */
@@ -32,6 +36,9 @@
         --ink: #e8e8e8;
         --muted: #9c9c9c;
         --line: #2a2a2a;        /* dark grey hairline */
+        --lg-a: #1c1c1c;
+        --lg-b: #232323;
+        --lg-c: #2e2e2e;
         --brand: #818cf8;
         --brand-ink: #0a0a0a;
         --ok: #4ade80;
@@ -59,6 +66,8 @@
         border-bottom: 1px solid var(--line);
         flex-wrap: wrap;
       }
+      header { overflow: hidden; }
+      .fab-chat { border-radius: 999px; }
       .logo {
         display: flex;
         align-items: center;
@@ -375,6 +384,65 @@
 
       /* toast */
       #toastWrap { position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%); z-index: 100; display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none; }
+      /* ================= Liquid glass (liquid-glass-js) =================
+         Vendored from https://github.com/dashersw/liquid-glass-js (MIT) and
+         driven by vendor/liquid-glass/stockpilot-liquid-glass.js. Each glass
+         surface (.lg-host) gets the library's WebGL canvas (.lg-layer) as a
+         backdrop; every path degrades to the CSS fallbacks below. */
+      .lg-layer {
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        pointer-events: none;
+        overflow: hidden;
+        border-radius: inherit;
+      }
+      .lg-layer canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        border-radius: inherit;
+      }
+      header.lg-host {
+        position: sticky;
+        border-bottom-color: color-mix(in srgb, var(--ink) 14%, var(--line));
+      }
+      .auth-card.lg-host { border-color: color-mix(in srgb, var(--ink) 12%, var(--line)); }
+      .fab-chat.lg-host { overflow: hidden; }
+      #toastWrap.lg-host {
+        gap: 8px;
+        border-radius: 14px;
+        padding: 10px;
+        box-sizing: border-box;
+        background: color-mix(in srgb, var(--panel) 42%, transparent);
+        border: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+        pointer-events: none;
+      }
+      @supports not (backdrop-filter: blur(1px)) {
+        .auth-card {
+          background: color-mix(in srgb, var(--panel) 88%, transparent);
+          box-shadow: 0 18px 44px rgba(2, 6, 23, 0.24);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .auth-card {
+          background: color-mix(in srgb, var(--panel) 78%, transparent);
+          backdrop-filter: blur(14px) saturate(1.25);
+          -webkit-backdrop-filter: blur(14px) saturate(1.25);
+          border-color: color-mix(in srgb, var(--ink) 12%, var(--line));
+        }
+        header {
+          background: color-mix(in srgb, var(--panel) 72%, transparent);
+          backdrop-filter: blur(14px) saturate(1.2);
+          -webkit-backdrop-filter: blur(14px) saturate(1.2);
+        }
+        .fab-chat {
+          background: color-mix(in srgb, var(--brand) 82%, transparent);
+          backdrop-filter: blur(10px);
+          -webkit-backdrop-filter: blur(10px);
+        }
+        .toast { background: color-mix(in srgb, var(--ink) 88%, transparent); }
+      }
       .toast {
         background: var(--ink);
         color: var(--bg);
@@ -403,6 +471,7 @@
         border-radius: 20px; padding: 26px 24px 18px; box-shadow: 0 24px 64px rgba(2, 6, 23, 0.28);
         animation: pop 0.18s ease-out;
       }
+      .auth-card { position: relative; overflow: hidden; }
       .auth-brand { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
       .auth-brand .logo-box { width: 38px; height: 38px; border-radius: 11px; font-size: 19px; }
       .auth-brand h2 { margin: 0; font-size: 18px; letter-spacing: -0.02em; }
@@ -1044,6 +1113,8 @@
     <div id="toastWrap"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./vendor/liquid-glass/container.js"></script>
+    <script src="./vendor/liquid-glass/stockpilot-liquid-glass.js"></script>
 
     <script>
       "use strict";
@@ -1370,6 +1441,7 @@
         const saved = localStorage.getItem(LS_THEME);
         const dark = saved ? saved === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
         document.documentElement.dataset.theme = dark ? "dark" : "light";
+        if (typeof window.refreshGlassTheme === "function") { try { window.refreshGlassTheme(); } catch (e) {} }
         document.getElementById("themeBtn").innerHTML = dark
           ? '<svg class="ic" aria-hidden="true"><use href="#i-sun"/></svg>'
           : '<svg class="ic" aria-hidden="true"><use href="#i-moon"/></svg>';

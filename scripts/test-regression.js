@@ -650,6 +650,16 @@ try {
   check("google auth: divider + button hidden on pending screen and restored by setAuthMode", /"authLinksRow", "authDivider", "authGoogle"/.test(scripts[0]) && (scripts[0].match(/"authDivider", "authGoogle"/g) || []).length === 2);
   check("google auth: uses supabase-js signInWithOAuth with google provider + redirect", /signInWithOAuth\(\{\s*provider: "google",\s*options: \{ redirectTo: location\.origin \+ location\.pathname \},\s*\}\)/.test(scripts[0]));
 
+
+  // ---- Liquid glass (vendored liquid-glass-js, WebGL + CSS fallbacks) ----
+  const glassLib = (() => { try { return fs.readFileSync("vendor/liquid-glass/container.js", "utf8"); } catch { return ""; } })();
+  const glassAdapter = (() => { try { return fs.readFileSync("vendor/liquid-glass/stockpilot-liquid-glass.js", "utf8"); } catch { return ""; } })();
+  const glassCss = (() => { try { return fs.readFileSync("vendor/liquid-glass/glass.css", "utf8"); } catch { return ""; } })();
+  check("glass: library vendored locally (CSP-safe: no CDN refs, html2canvas path unreachable)", /class Container \{/.test(glassLib) && !/cdn\.jsdelivr/.test(glassLib + glassAdapter) && !/html2canvas\s*\(/.test(glassAdapter) && /Container\.pageSnapshot = snap;/.test(glassAdapter) && /src="\.\/vendor\/liquid-glass\/container\.js"/.test(html) && /src="\.\/vendor\/liquid-glass\/stockpilot-liquid-glass\.js"/.test(html) && /rel="stylesheet" href="\.\/vendor\/liquid-glass\/glass\.css"/.test(html) && /\.glass-container \{/.test(glassCss));
+  check("glass: adapter is guarded (WebGL probe, reduced-motion, late boot)", /getContext\("webgl"\)/.test(glassAdapter) && /prefers-reduced-motion: reduce/.test(glassAdapter) && /window\.addEventListener\("load", boot\)/.test(glassAdapter) && /typeof window === "undefined" \|\| typeof document === "undefined"/.test(glassAdapter));
+  check("glass: app surfaces are opt-in hosts with CSS fallback chips", /\.lg-layer \{/.test(html) && /\.auth-card \{ position: relative; overflow: hidden; \}/.test(html) && /header \{ overflow: hidden; \}/.test(html) && /@supports not \(backdrop-filter: blur\(1px\)\)/.test(html) && /@media \(prefers-reduced-motion: reduce\)/.test(html));
+  check("glass: small viewports skip WebGL + hard caps (4 surfaces, DPR ≤ 1.5, debounced resize)", /w > 0 && w <= 520/.test(glassAdapter) && /var MAX = 4;/.test(glassAdapter) && /devicePixelRatio \|\| 1, 1\.5\)/.test(glassAdapter) && /new ResizeObserver/.test(glassAdapter) && /pendingResize/.test(glassAdapter));
+  check("glass: snapshot is procedural + theme-aware (no stale page capture)", /Container\.pageSnapshot = snap;/.test(glassAdapter) && /window\.refreshGlassTheme = function/.test(glassAdapter) && /refreshGlassTheme\(\)/.test(scripts[0]));
   check("CSP meta restricts network to Supabase + CDN", /http-equiv="Content-Security-Policy"[^>]*connect-src 'self' https:\/\/\*\.supabase\.co wss:\/\/\*\.supabase\.co/.test(html));
   check("CSP meta forbids objects, forms and base hijacking", /object-src 'none'/.test(html) && /form-action 'none'/.test(html) && /base-uri 'none'/.test(html));
   check("referrer policy is no-referrer", /<meta name="referrer" content="no-referrer" \/>/.test(html));
@@ -858,6 +868,113 @@ try {
     await new Promise((r) => setTimeout(r, 0));
     check("google auth: provider error surfaces as friendly auth message", /providers → google/i.test(els.authErr.textContent), els.authErr.textContent);
     check("google auth: button re-enabled after error", els.authGoogle.disabled === false, String(els.authGoogle.disabled));
+
+
+    // Liquid glass adapter: run it in throwaway sandboxes. It must be inert
+    // without WebGL, and short-circuit before any painting with reduced motion.
+    console.log("\n— Liquid glass adapter (guarded boot) —");
+    const adapterSrc = fs.readFileSync("vendor/liquid-glass/stockpilot-liquid-glass.js", "utf8");
+    function runAdapter(win, doc, extra) {
+      const sbx = Object.assign({ window: win, document: doc, setTimeout: noop }, extra || {});
+      win.window = win;
+      vm.createContext(sbx);
+      vm.runInContext(adapterSrc, sbx, { filename: "vendor/liquid-glass/stockpilot-liquid-glass.js" });
+      return sbx;
+    }
+    let plainProbes = 0;
+    const plainDoc = { createElement: () => { plainProbes++; return { getContext: () => null }; }, readyState: "loading", documentElement: {}, addEventListener: noop };
+    const plainWin = { matchMedia: () => ({ matches: false }), addEventListener: noop, innerWidth: 1024 };
+    const plain = runAdapter(plainWin, plainDoc);
+    check("glass: sandbox without WebGL stays inert (flags set, nothing painted)", plain.window.__stockpilotGlassReady === false && typeof plain.window.refreshGlassTheme === "function" && plainProbes === 1, JSON.stringify({ probes: plainProbes }));
+    let hookSafe = true;
+    try { plain.window.refreshGlassTheme(); } catch { hookSafe = false; }
+    check("glass: theme hook is a guarded no-op when glass is off", hookSafe);
+
+    let reducedProbes = 0;
+    let constructions = 0;
+    const reducedDoc = {
+      createElement: () => {
+        reducedProbes++;
+        return {
+          width: 0, height: 0,
+          getContext: (t) => (t === "webgl" ? {} : t === "2d" ? { createLinearGradient: () => ({ addColorStop: noop }), createRadialGradient: () => ({ addColorStop: noop }), fillRect: noop, beginPath: noop, arc: noop, fill: noop } : null),
+        };
+      },
+      readyState: "complete",
+      documentElement: {},
+      addEventListener: noop,
+    };
+    const reducedWin = { matchMedia: () => ({ matches: true }), addEventListener: noop, innerWidth: 1024 };
+    const reduced = runAdapter(reducedWin, reducedWin, {
+      getComputedStyle: () => ({ getPropertyValue: () => "#123456" }),
+      Container: function () { constructions++; throw new Error("Container must not be constructed"); },
+    });
+    check("glass: prefers-reduced-motion short-circuits before any canvas work", reduced.window.__stockpilotGlassReady === false && reducedProbes === 0 && constructions === 0, JSON.stringify({ probes: reducedProbes, constructions }));
+
+    // Full integration: the REAL vendored container.js + adapter in a sandbox
+    // with WebGL/2D canvas mocks. Proves the glass pipeline boots, adopts the
+    // app surfaces, caps DPR, and NEVER touches the html2canvas capture path.
+    const containerSrc = fs.readFileSync("vendor/liquid-glass/container.js", "utf8");
+    const GL = {
+      viewport: noop, clearColor: noop, clear: noop, createBuffer: () => ({}), bindBuffer: noop,
+      bufferData: noop, createTexture: () => ({}), bindTexture: noop, texImage2D: noop,
+      texParameteri: noop, activeTexture: noop, uniform1i: noop, uniform1f: noop, uniform2f: noop,
+      createShader: () => ({}), shaderSource: noop, compileShader: noop, getShaderParameter: () => true,
+      createProgram: () => ({}), attachShader: noop, linkProgram: noop, getProgramParameter: () => true,
+      useProgram: noop, enableVertexAttribArray: noop, vertexAttribPointer: noop,
+      getAttribLocation: () => 0, getUniformLocation: () => ({}), drawArrays: noop,
+      ARRAY_BUFFER: 1, TEXTURE_2D: 2, RGBA: 3, UNSIGNED_BYTE: 4, TEXTURE_MIN_FILTER: 5,
+      TEXTURE_MAG_FILTER: 6, LINEAR: 7, TEXTURE_WRAP_S: 8, TEXTURE_WRAP_T: 9, CLAMP_TO_EDGE: 10,
+      TEXTURE0: 11, STATIC_DRAW: 12, TRIANGLES: 13, FLOAT: 14, VERTEX_SHADER: 15,
+      FRAGMENT_SHADER: 16, COMPILE_STATUS: 17, LINK_STATUS: 18, COLOR_BUFFER_BIT: 19,
+    };
+    function glassCanvas() {
+      return {
+        width: 0, height: 0, style: {},
+        getContext: (t) => (t === "webgl" ? Object.assign({}, GL) : t === "2d"
+          ? { createLinearGradient: () => ({ addColorStop: noop }), createRadialGradient: () => ({ addColorStop: noop }), fillRect: noop, beginPath: noop, arc: noop, fill: noop, toDataURL: () => "data:image/png;base64," }
+          : null),
+        toDataURL: () => "data:image/png;base64,",
+      };
+    }
+    function glassHost(cls) {
+      return {
+        className: cls || "", style: {}, children: [],
+        classList: { _s: new Set(cls ? [cls] : []), add(c) { this._s.add(c); }, remove(c) { this._s.delete(c); }, toggle() {}, contains(c) { return this._s.has(c); } },
+        appendChild(c) { c.parentNode = this; this.children.push(c); return c; },
+        insertBefore(c) { c.parentNode = this; this.children.unshift(c); return c; },
+        removeAttribute: noop,
+        getBoundingClientRect: () => ({ width: 320, height: 56, left: 8, top: 8 }),
+        firstChild: null,
+      };
+    }
+    let html2canvasCalls = 0;
+    const gwin = {
+      matchMedia: () => ({ matches: false }),
+      addEventListener: noop,
+      innerWidth: 1024,
+      devicePixelRatio: 2, // must be capped to 1.5 by the adapter
+    };
+    const gdoc = {
+      readyState: "complete",
+      documentElement: { dataset: {}, classList: { _s: new Set(), add(c) { this._s.add(c); } } },
+      createElement: (tag) => (tag === "canvas" ? glassCanvas() : glassHost()),
+      querySelector: () => glassHost("auth-card"),
+      getElementById: () => glassHost(),
+      addEventListener: noop,
+    };
+    const gsbx = Object.assign(
+      { window: gwin, document: gdoc, setTimeout: (fn) => { fn(); return 0; }, requestAnimationFrame: (fn) => { fn(); return 0; }, getComputedStyle: () => ({ getPropertyValue: () => "#abcdef" }), Image: class { constructor() { this.onload = null; } }, html2canvas: () => { html2canvasCalls++; return { then: () => ({ catch: noop }) }; } },
+    );
+    gwin.window = gwin;
+    vm.createContext(gsbx);
+    vm.runInContext(containerSrc, gsbx, { filename: "vendor/liquid-glass/container.js" });
+    vm.runInContext(adapterSrc, gsbx, { filename: "vendor/liquid-glass/stockpilot-liquid-glass.js" });
+    gsbx.__glassProbe = null;
+    vm.runInContext("__glassProbe = { count: Container.instances.length, canvasW: Container.instances[0] ? Container.instances[0].canvas.width : 0, snapshot: !!Container.pageSnapshot, ready: window.__stockpilotGlassReady };", gsbx);
+    const gp = gsbx.__glassProbe;
+    check("glass: real pipeline boots on all 4 surfaces without html2canvas", gp.count === 4 && gp.snapshot === true && html2canvasCalls === 0 && gp.ready === true, JSON.stringify({ gp, html2canvasCalls }));
+    check("glass: device pixel ratio is capped (2.0 device → 1.5 backing store)", gp.canvasW === Math.round(320 * 1.5), String(gp.canvasW));
 
     // Re-run: an account that already has stores must not get a duplicate.
     const before = mock.counts.insert;
