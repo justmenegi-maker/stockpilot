@@ -7,7 +7,7 @@
 //     they must hit the network, and no auth/data responses are stored in a cache.
 "use strict";
 
-const VERSION = "stockpilot-v2";
+const VERSION = "stockpilot-v1";
 const ASSETS = [
   "./",
   "./index.html",
@@ -16,10 +16,6 @@ const ASSETS = [
   "./icons/icon-512.png",
   "./icons/maskable-192.png",
   "./icons/maskable-512.png",
-  // Liquid glass (vendored, MIT — see vendor/liquid-glass/LICENSE)
-  "./vendor/liquid-glass/container.js",
-  "./vendor/liquid-glass/stockpilot-liquid-glass.js",
-  "./vendor/liquid-glass/glass.css",
 ];
 
 self.addEventListener("install", (event) => {
