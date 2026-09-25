@@ -390,6 +390,77 @@
       }
       .toast.show { opacity: 1; transform: none; }
 
+      /* ================= MagicUI-inspired accents =================
+         Vanilla CSS ports of magicuidesign/magicui recipes — border beam
+         (border-beam.tsx), shiny text (animated-shiny-text.tsx), dot
+         pattern (dot-pattern.tsx) and a card sheen. CSP-safe: pure CSS,
+         no runtime, honors prefers-reduced-motion. */
+      .mg-border-beam {
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        pointer-events: none;
+        overflow: hidden;
+      }
+      .mg-border-beam::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: -40%;
+        width: 40%;
+        height: 2px;
+        border-radius: 999px;
+        background: linear-gradient(90deg, transparent, var(--brand) 45%, #d4af37 55%, transparent);
+        animation: mg-beam 5.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+      }
+      @keyframes mg-beam {
+        0% { transform: translateX(0); opacity: 0; }
+        8% { opacity: 1; }
+        92% { opacity: 1; }
+        100% { transform: translateX(350%); opacity: 0; }
+      }
+      .mg-shiny {
+        background: linear-gradient(110deg, var(--muted) 40%, var(--brand) 50%, var(--muted) 60%);
+        background-size: 250% 100%;
+        background-clip: text;
+        -webkit-background-clip: text;
+        color: transparent;
+        animation: mg-shiny 6s ease-in-out infinite;
+      }
+      @keyframes mg-shiny {
+        0% { background-position: 110% 0; }
+        100% { background-position: -110% 0; }
+      }
+      .mg-beam { position: relative; overflow: hidden; }
+      .mg-dot-grid {
+        background-image: radial-gradient(color-mix(in srgb, var(--ink) 9%, transparent) 1px, transparent 1px);
+        background-size: 18px 18px;
+      }
+      .stat { position: relative; overflow: hidden; }
+      .stat::after {
+        content: "";
+        position: absolute;
+        top: 0; bottom: 0;
+        left: -30%;
+        width: 30%;
+        pointer-events: none;
+        background: linear-gradient(105deg, transparent, color-mix(in srgb, var(--brand) 7%, transparent), transparent);
+        opacity: 0;
+      }
+      .stat:hover::after {
+        opacity: 1;
+        animation: mg-sheen 0.9s ease-out;
+      }
+      @keyframes mg-sheen {
+        0% { transform: translateX(0); }
+        100% { transform: translateX(430%); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .mg-border-beam::before, .mg-shiny, .stat::after { animation: none; }
+        .mg-shiny { background-position: 50% 0; }
+        .stat:hover::after { opacity: 0; }
+      }
+
       /* ================= Cloud / auth ================= */
       .hidden { display: none !important; }
       #authBackdrop {
@@ -787,7 +858,7 @@
       </div>
 
       <div id="storeView">
-      <div class="stats">
+      <div class="stats mg-dot-grid">
         <div class="stat"><span class="label">Total items</span><span class="value" id="statTotal">0</span></div>
         <div class="stat"><span class="label">Units in stock</span><span class="value" id="statUnits">0</span></div>
         <div class="stat"><span class="label">Stock value</span><span class="value" id="statValue">$0</span></div>
@@ -926,11 +997,12 @@
     </dialog>
 
     <div id="authBackdrop" style="display:none">
-      <div class="auth-card">
+      <div class="auth-card mg-beam">
+        <span class="mg-border-beam" aria-hidden="true"></span>
         <div class="auth-brand">
           <div class="logo-box">📦</div>
           <div>
-            <h2 id="authTitle">Sign in to StockPilot</h2>
+            <h2 id="authTitle" class="mg-shiny">Sign in to StockPilot</h2>
             <p class="sub" id="authSub">One account, all your stores — synced in the cloud.</p>
           </div>
         </div>
