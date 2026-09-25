@@ -655,6 +655,11 @@ try {
   check("referrer policy is no-referrer", /<meta name="referrer" content="no-referrer" \/>/.test(html));
   check("cloud-sourced ids are escaped in attributes", !/data-(id|del)="\$\{(it|s)\./.test(scripts[0]) && (scripts[0].match(/data-(id|del)="\$\{esc\(/g) || []).length === 8);
 
+  // ---- MagicUI-inspired accents (vanilla CSS ports, CSP-safe) ----
+  check("magicui: border-beam port on the auth card", /class="auth-card mg-beam"/.test(html) && /class="mg-border-beam" aria-hidden="true"/.test(html) && /@keyframes mg-beam/.test(html));
+  check("magicui: shiny-text heading + dot-pattern stats", /<h2 id="authTitle" class="mg-shiny">/.test(html) && /stats mg-dot-grid/.test(html) && /@keyframes mg-shiny/.test(html));
+  check("magicui: pure CSS (no runtime deps), reduced-motion honored", !/magicui|motion\/react|framer/.test(scripts[0]) && /@media \(prefers-reduced-motion: reduce\)/.test(html));
+
   // ---- PWA: manifest, icons, service worker ----
   let manifestOk = false, manifestIcons = 0;
   try { const mf = JSON.parse(fs.readFileSync("manifest.webmanifest", "utf8")); manifestOk = mf.display === "standalone" && mf.start_url === "./"; manifestIcons = mf.icons.length; } catch {}
@@ -699,7 +704,7 @@ try {
   check("UI: alert badge is borderless text", /\.alert-badge \{[\s\S]*?border: 1px solid transparent;/.test(html));
   check("UI: chat chips are quiet text links (no borders)", /\.chip \{\s*\n\s*font-size: 12px;\s*\n\s*padding: 5px 6px;\s*\n\s*border-radius: 8px;\s*\n\s*border: none;/.test(html));
   check("UI: FAB glow is neutral (no colored shadow)", !/rgba\(79, 70, 229/.test(html));
-  check("UI: auth/account headings are plain text (no emoji)", /<h2 id="authTitle">Sign in to StockPilot<\/h2>/.test(html) && /<h3 id="acctTitle">Account settings<\/h3>/.test(html));
+  check("UI: auth/account headings are plain text (no emoji)", /<h2 id="authTitle" class="mg-shiny">Sign in to StockPilot<\/h2>/.test(html) && /<h3 id="acctTitle">Account settings<\/h3>/.test(html));
   check("UI: search input has no decorative emoji", !/<div class="search">🔎/.test(html));
   check("UI: secondary header actions are icon-only on desktop too", /\.header-actions \.btn-label \{ display: none; \}/.test(html));
 
